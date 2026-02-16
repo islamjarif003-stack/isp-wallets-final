@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/@prisma/account-wallet-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("ACCOUNT_WALLET_DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_VERIFICATION
+}
+
+enum RoleName {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  USER
+}
+
+enum WalletStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionCategory {
+  BALANCE_ADD
+  BALANCE_ADD_APPROVED
+  TOPUP_BONUS
+  SERVICE_PURCHASE
+  SERVICE_REFUND
+  ADMIN_ADJUSTMENT
+  COMMISSION
+  SYSTEM_CREDIT
+  SYSTEM_DEBIT
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REVERSED
+}
+
+enum OtpType {
+  SIGNUP_VERIFICATION
+  FORGOT_PASSWORD
+}
+
+enum OtpStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  BLOCKED
+}
+
+enum AuditAction {
+  USER_CREATE
+  USER_UPDATE
+  USER_SUSPEND
+  USER_BAN
+  USER_ACTIVATE
+  ROLE_ASSIGN
+  WALLET_CREDIT
+  WALLET_DEBIT
+  WALLET_ADJUSTMENT
+  WALLET_FREEZE
+  WALLET_UNFREEZE
+  BALANCE_APPROVE
+  BALANCE_REJECT
+  SERVICE_MANUAL_EXECUTE
+  SERVICE_REFUND
+  SETTING_UPDATE
+  SYSTEM_CONFIG_CHANGE
+}
+
+model Role {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      RoleName @unique
+  label     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  mobile       String     @unique @db.VarChar(15)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  fullName     String     @map("full_name") @db.VarChar(100)
+  email        String?    @db.VarChar(255)
+  status       UserStatus @default(PENDING_VERIFICATION)
+  roleId       String     @map("role_id") @db.Uuid
+  isVerified   Boolean    @default(false) @map("is_verified")
+  lastLoginAt  DateTime?  @map("last_login_at")
+  loginCount   Int        @default(0) @map("login_count")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  role              Role              @relation(fields: [roleId], references: [id])
+  wallet            Wallet?
+  otpRequests       OtpRequest[]
+  auditLogsAsAdmin  AdminAuditLog[]   @relation("AuditAdmin")
+  auditLogsAsTarget AdminAuditLog[]   @relation("AuditTarget")
+  balanceRequests   BalanceRequest[]
+
+  @@index([mobile])
+  @@index([status])
+  @@map("users")
+}
+
+model Wallet {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @unique @map("user_id") @db.Uuid
+  status         WalletStatus @default(ACTIVE)
+  cachedBalance  Decimal      @default(0) @map("cached_balance") @db.Decimal(15, 2)
+  lastSyncedAt   DateTime?    @map("last_synced_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  user         User                @relation(fields: [userId], references: [id])
+  transactions WalletTransaction[]
+
+  @@index([userId])
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id              String              @id @default(uuid()) @db.Uuid
+  walletId        String              @map("wallet_id") @db.Uuid
+  type            TransactionType
+  category        TransactionCategory
+  amount          Decimal             @db.Decimal(15, 2)
+  balanceBefore   Decimal             @map("balance_before") @db.Decimal(15, 2)
+  balanceAfter    Decimal             @map("balance_after") @db.Decimal(15, 2)
+  status          TransactionStatus   @default(PENDING)
+  idempotencyKey  String              @unique @map("idempotency_key") @db.VarChar(255)
+  externalTrxId   String?             @unique @map("external_trx_id") @db.VarChar(255)
+  description     String?             @db.Text
+  metadata        Json?
+  commission      Decimal?            @db.Decimal(15, 2)
+  referenceType   String?             @map("reference_type") @db.VarChar(50)
+  referenceId     String?             @map("reference_id") @db.VarChar(255)
+  reversedFromId  String?             @map("reversed_from_id") @db.Uuid
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@index([idempotencyKey])
+  @@index([externalTrxId])
+  @@index([category])
+  @@index([status])
+  @@index([createdAt])
+  @@map("wallet_transactions")
+}
+
+model BalanceRequest {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  amount          Decimal  @db.Decimal(15, 2)
+  paymentMethod   String   @map("payment_method") @db.VarChar(50)
+  paymentReference String? @map("payment_reference") @db.VarChar(255)
+  status          String   @default("PENDING") @db.VarChar(20)
+  adminNote       String?  @map("admin_note") @db.Text
+  approvedBy      String?  @map("approved_by") @db.Uuid
+  approvedAt      DateTime? @map("approved_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("balance_requests")
+}
+
+model OtpRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String?   @map("user_id") @db.Uuid
+  mobile      String    @db.VarChar(15)
+  otpHash     String    @map("otp_hash") @db.VarChar(255)
+  type        OtpType
+  status      OtpStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5) @map("max_attempts")
+  expiresAt   DateTime  @map("expires_at")
+  verifiedAt  DateTime? @map("verified_at")
+  ipAddress   String?   @map("ip_address") @db.VarChar(45)
+  userAgent   String?   @map("user_agent") @db.VarChar(500)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([mobile, type, status])
+  @@index([expiresAt])
+  @@map("otp_requests")
+}
+
+model AdminAuditLog {
+  id            String      @id @default(uuid()) @db.Uuid
+  adminId       String      @map("admin_id") @db.Uuid
+  action        AuditAction
+  targetUserId  String?     @map("target_user_id") @db.Uuid
+  resourceType  String?     @map("resource_type") @db.VarChar(50)
+  resourceId    String?     @map("resource_id") @db.VarChar(255)
+  previousData  Json?       @map("previous_data")
+  newData       Json?       @map("new_data")
+  reason        String?     @db.Text
+  ipAddress     String?     @map("ip_address") @db.VarChar(45)
+  userAgent     String?     @map("user_agent") @db.VarChar(500)
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  admin  User  @relation("AuditAdmin", fields: [adminId], references: [id])
+  target User? @relation("AuditTarget", fields: [targetUserId], references: [id])
+
+  @@index([adminId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.Text
+  type      String   @default("string") @db.VarChar(20)
+  label     String?  @db.VarChar(200)
+  group     String?  @db.VarChar(50)
+  updatedBy String?  @map("updated_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([key])
+  @@index([group])
+  @@map("system_settings")
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String   @db.VarChar(200)
+  message   String   @db.Text
+  type      String   @db.VarChar(50)
+  isRead    Boolean  @default(false) @map("is_read")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}

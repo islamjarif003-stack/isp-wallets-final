@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": "ts",
+  "ignore": ["node_modules", "dist", "logs"],
+  "exec": "ts-node --transpile-only src/index.ts"
+}
