@@ -41,6 +41,11 @@ enum CardStatus {
   USED
 }
 
+enum ExecutionMethod {
+  AUTOMATIC
+  MANUAL
+}
+
 model ServicePackage {
   id             String        @id @default(uuid()) @db.Uuid
   serviceType    ServiceType   @map("service_type")
@@ -196,7 +201,7 @@ model ServiceExecutionLog {
   walletTransactionId   String?         @map("wallet_transaction_id") @db.VarChar(255)
   refundTransactionId   String?         @map("refund_transaction_id") @db.VarChar(255)
   executedBy            String?         @map("executed_by") @db.VarChar(255)
-  executionMethod       String          @default("AUTOMATIC") @map("execution_method") @db.VarChar(20)
+  executionMethod       ExecutionMethod @default(AUTOMATIC) @map("execution_method")
   errorMessage          String?         @map("error_message") @db.Text
   requestPayload        Json?           @map("request_payload")
   responsePayload       Json?           @map("response_payload")

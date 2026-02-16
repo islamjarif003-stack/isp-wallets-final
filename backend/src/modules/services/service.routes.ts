@@ -22,16 +22,18 @@ const controller = new ServiceController();
 // PUBLIC: Package listing (still needs auth)
 // ═══════════════════════════════════════════════
 
-router.use(authMiddleware);
+
 
 router.get(
   '/packages',
+  authMiddleware, // Added
   requireUser(),
   controller.getPackages.bind(controller)
 );
 
 router.get(
   '/packages/:packageId',
+  authMiddleware,
   requireUser(),
   validateParams(packageIdParamSchema),
   controller.getPackageById.bind(controller)
@@ -43,6 +45,7 @@ router.get(
 
 router.post(
   '/purchase/home-internet',
+  authMiddleware,
   requireUser(),
   validateBody(purchaseHomeInternetSchema),
   controller.purchaseHomeInternet.bind(controller)
@@ -53,6 +56,7 @@ router.post(
 
 router.post(
   '/purchase/mobile-recharge',
+  authMiddleware,
   requireUser(),
   validateBody(purchaseMobileRechargeSchema),
   controller.purchaseMobileRecharge.bind(controller)
@@ -60,6 +64,7 @@ router.post(
 
 router.post(
   '/purchase/electricity',
+  authMiddleware,
   requireUser(),
   validateBody(purchaseElectricitySchema),
   controller.purchaseElectricityBill.bind(controller)
@@ -71,30 +76,35 @@ router.post(
 
 router.get(
   '/history',
+  authMiddleware,
   requireUser(),
   controller.getMyServiceHistory.bind(controller)
 );
 
 router.get(
   '/my/home-services',
+  authMiddleware,
   requireUser(),
   controller.getMyHomeServices.bind(controller)
 );
 
 router.get(
   '/my/hotspot-services',
+  authMiddleware,
   requireUser(),
   controller.getMyHotspotServices.bind(controller)
 );
 
 router.get(
   '/my/recharges',
+  authMiddleware,
   requireUser(),
   controller.getMyRechargeHistory.bind(controller)
 );
 
 router.get(
   '/my/electricity-bills',
+  authMiddleware,
   requireUser(),
   controller.getMyElectricityHistory.bind(controller)
 );
@@ -105,12 +115,14 @@ router.get(
 
 router.get(
   '/admin/packages',
+  authMiddleware,
   requireAdmin(),
   controller.getPackagesAdmin.bind(controller)
 );
 
 router.post(
   '/admin/packages',
+  authMiddleware,
   requireAdmin(),
   validateBody(createPackageSchema),
   controller.createPackage.bind(controller)
@@ -118,6 +130,7 @@ router.post(
 
 router.put(
   '/admin/packages/:packageId',
+  authMiddleware,
   requireAdmin(),
   validateParams(packageIdParamSchema),
   validateBody(updatePackageSchema),
@@ -130,18 +143,21 @@ router.put(
 
 router.get(
   '/admin/pending',
+  authMiddleware,
   requireAdmin(),
   controller.getPendingServices.bind(controller)
 );
 
 router.get(
   '/admin/execution-logs',
+  authMiddleware,
   requireAdmin(),
   controller.getAllExecutionLogs.bind(controller)
 );
 
 router.post(
   '/admin/manual-execute/:executionLogId',
+  authMiddleware,
   requireAdmin(),
   validateParams(z.object({ executionLogId: z.string().uuid() })),
   controller.adminManualExecute.bind(controller)
@@ -149,6 +165,7 @@ router.post(
 
 router.post(
   '/admin/manual-refund/:executionLogId',
+  authMiddleware,
   requireAdmin(),
   validateParams(z.object({ executionLogId: z.string().uuid() })),
   validateBody(z.object({ reason: z.string().trim().min(5).max(500) })),
@@ -157,6 +174,7 @@ router.post(
 
 router.post(
   '/admin/services/release-home-connection',
+  authMiddleware,
   requireAdmin(),
   validateBody(z.object({
     connectionId: z.union([z.string(), z.number()]).transform((val) => String(val).trim())

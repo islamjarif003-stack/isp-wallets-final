@@ -168,7 +168,6 @@ export class StbService {
         data: {
           serviceType: 'SET_TOP_BOX',
           serviceRecordId: 'PENDING',
-          packageId: null,
           userId: input.userId,
           status: 'PENDING',
           requestPayload: {

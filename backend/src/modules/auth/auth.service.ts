@@ -351,6 +351,9 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
+    if (!userId) {
+      throw new UnauthorizedError('User ID not provided');
+    }
     const user = await this.db.user.findUnique({
       where: { id: userId },
       include: { role: true, wallet: true },

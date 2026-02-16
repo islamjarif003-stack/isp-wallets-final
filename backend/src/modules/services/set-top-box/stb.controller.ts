@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { StbService } from './stb.service';
-import { AppError } from '../../../utils/errors';
+import { logger } from '../../../utils/logger';
+import { UnauthorizedError, AppError } from '../../../utils/errors';
 
 const stbService = new StbService();
 
@@ -13,7 +14,7 @@ export class StbController {
     try {
       const result = await stbService.adminReleaseStbOwnership(
         req.body.stbNumber,
-        req.userId!,
+        req.user!.id,
         req.ipAddress,
         req.headers['user-agent']
       );
@@ -77,7 +78,7 @@ export class StbController {
     try {
       // If admin, can see inactive?
       // For now, strict: only active for users, all for admin if query param set
-      const includeInactive = req.userRole === 'SUPER_ADMIN' && req.query.includeInactive === 'true';
+      const includeInactive = req.user?.role === 'SUPER_ADMIN' && req.query.includeInactive === 'true';
       const result = await stbService.getPackages(includeInactive);
       res.status(200).json({
         success: true,
@@ -90,11 +91,14 @@ export class StbController {
 
   async purchaseStbService(req: Request, res: Response, next: NextFunction) {
     try {
-      if (!req.userId) throw new AppError('User ID missing', 401);
+      if (!req.user?.id || !req.user?.walletId) {
+        logger.warn('Auth data missing in service purchase', { path: req.path });
+        throw new UnauthorizedError('Authentication details are missing. Please log in again.');
+      }
 
       const result = await stbService.purchaseStbService({
-        userId: req.userId,
-        walletId: req.body.walletId,
+        userId: req.user.id,
+        walletId: req.user.walletId,
         packageId: req.body.packageId,
         stbNumber: req.body.stbNumber,
       });
@@ -107,9 +111,9 @@ export class StbController {
 
   async getMyStbServices(req: Request, res: Response, next: NextFunction) {
     try {
-      if (!req.userId) throw new AppError('User ID missing', 401);
+      if (!req.user?.id) throw new AppError('User ID missing', 401);
 
-      const result = await stbService.getMyStbServices(req.userId);
+      const result = await stbService.getMyStbServices(req.user.id);
       res.status(200).json({
         success: true,
         data: result,

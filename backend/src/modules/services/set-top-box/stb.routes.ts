@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { StbController } from './stb.controller';
+import { authMiddleware } from '../../../middleware/auth.middleware';
 import { requireSuperAdmin, requireUser, requireAdmin } from '../../../middleware/rbac.middleware';
 import { validateBody } from '../../../middleware/validation.middleware';
 import { createStbPackageSchema, purchaseStbSchema, updateStbPackageStatusSchema, updateStbPackageSchema } from './stb.validators';
@@ -9,13 +10,16 @@ const router = Router();
 const controller = new StbController();
 
 // ═══════════════════════════════════════════════
-// PUBLIC (Authenticated)
+// PUBLIC
 // ═══════════════════════════════════════════════
 
 router.get(
   '/packages',
   controller.getPackages.bind(controller)
 );
+
+// All routes below this require authentication
+router.use(authMiddleware);
 
 // ═══════════════════════════════════════════════
 // USER

@@ -1,13 +1,13 @@
-// Express Type Definitions
-import type { RoleName } from '@prisma/account-wallet-client';
+import { RoleName } from '@prisma/account-wallet-client';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: any;
-      userId?: string;
-      userRole?: RoleName;
-      walletId?: string;
+      user?: {
+        id: string;
+        role: RoleName;
+        walletId: string;
+      };
       ipAddress?: string;
     }
   }

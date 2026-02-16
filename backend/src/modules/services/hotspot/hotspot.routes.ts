@@ -1,11 +1,21 @@
 import { Router } from 'express';
 import { HotspotController } from './hotspot.controller';
+import { authMiddleware } from '../../../middleware/auth.middleware';
 import { requireAdmin, requireUser } from '../../../middleware/rbac.middleware';
 import { validateBody } from '../../../middleware/validation.middleware';
 import { addHotspotCardsSchema, purchaseHotspotSchema } from './hotspot.validators';
 
 const router = Router();
 const controller = new HotspotController();
+
+// Public routes
+router.get(
+  '/stock/:packageId',
+  controller.getStock.bind(controller)
+);
+
+// All subsequent routes are authenticated
+router.use(authMiddleware);
 
 // ═══════════════════════════════════════════════
 // ADMIN (ADMIN & SUPER_ADMIN)
@@ -63,12 +73,6 @@ router.post(
 // ═══════════════════════════════════════════════
 // USER
 // ═══════════════════════════════════════════════
-
-router.get(
-  '/stock/:packageId',
-  requireUser(),
-  controller.getStock.bind(controller)
-);
 
 router.post(
   '/purchase',

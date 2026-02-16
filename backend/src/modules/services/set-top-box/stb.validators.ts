@@ -20,5 +20,4 @@ export const updateStbPackageStatusSchema = z.object({
 export const purchaseStbSchema = z.object({
   packageId: z.string().uuid(),
   stbNumber: z.string().min(3).max(50),
-  walletId: z.string().uuid(),
 });

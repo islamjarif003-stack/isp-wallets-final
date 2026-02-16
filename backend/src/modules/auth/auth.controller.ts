@@ -127,7 +127,7 @@ export class AuthController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const result = await authService.getProfile(req.userId!);
+      const result = await authService.getProfile(req.user!.id);
 
       res.status(200).json({
         success: true,

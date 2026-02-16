@@ -65,9 +65,13 @@ export async function authMiddleware(
       );
     }
 
-    req.userId = decoded.userId;
-    req.userRole = decoded.role;
-    req.walletId = decoded.walletId;
+    // Attach user information to the request object as per requirements
+    req.user = {
+      id: decoded.userId,
+      role: decoded.role,
+      walletId: decoded.walletId,
+    };
+
     req.ipAddress =
       req.ip || (req.headers['x-forwarded-for'] as string) || undefined;
 

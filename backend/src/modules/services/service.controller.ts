@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { ServiceService } from './service.service';
 import { ServiceType, ExecutionStatus } from '@prisma/service-client';
+import { logger } from '../../utils/logger';
+import { UnauthorizedError } from '../../utils/errors';
 
 const serviceService = new ServiceService();
 
@@ -80,14 +82,17 @@ export class ServiceController {
 
   async purchaseHomeInternet(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id || !req.user?.walletId) {
+        logger.warn('Auth data missing in service purchase', { path: req.path });
+        throw new UnauthorizedError('Authentication details are missing. Please log in again.');
+      }
+
       const result = await serviceService.purchaseHomeInternet({
-        userId: req.userId!,
-        walletId: req.walletId!,
+        userId: req.user.id,
+        walletId: req.user.walletId,
         packageId: req.body.packageId,
         connectionId: req.body.connectionId,
-        subscriberName: req.body.subscriberName,
-        address: req.body.address,
-        area: req.body.area,
+        ipAddress: req.ipAddress,
       });
 
       const statusCode = result.status === 'COMPLETED' ? 200 : 202;
@@ -104,9 +109,14 @@ export class ServiceController {
 
   async purchaseHotspot(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id || !req.user?.walletId) {
+        logger.warn('Auth data missing in service purchase', { path: req.path });
+        throw new UnauthorizedError('Authentication details are missing. Please log in again.');
+      }
+
       const result = await serviceService.purchaseHotspot({
-        userId: req.userId!,
-        walletId: req.walletId!,
+        userId: req.user.id,
+        walletId: req.user.walletId,
         packageId: req.body.packageId,
         deviceMac: req.body.deviceMac,
         zoneId: req.body.zoneId,
@@ -126,9 +136,14 @@ export class ServiceController {
 
   async purchaseMobileRecharge(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id || !req.user?.walletId) {
+        logger.warn('Auth data missing in service purchase', { path: req.path });
+        throw new UnauthorizedError('Authentication details are missing. Please log in again.');
+      }
+
       const result = await serviceService.purchaseMobileRecharge({
-        userId: req.userId!,
-        walletId: req.walletId!,
+        userId: req.user.id,
+        walletId: req.user.walletId,
         mobileNumber: req.body.mobileNumber,
         operator: req.body.operator,
         amount: req.body.amount,
@@ -149,9 +164,14 @@ export class ServiceController {
 
   async purchaseElectricityBill(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id || !req.user?.walletId) {
+        logger.warn('Auth data missing in service purchase', { path: req.path });
+        throw new UnauthorizedError('Authentication details are missing. Please log in again.');
+      }
+
       const result = await serviceService.purchaseElectricityBill({
-        userId: req.userId!,
-        walletId: req.walletId!,
+        userId: req.user.id,
+        walletId: req.user.walletId,
         meterNumber: req.body.meterNumber,
         provider: req.body.provider,
         accountHolder: req.body.accountHolder,
@@ -175,8 +195,11 @@ export class ServiceController {
 
   async getMyServiceHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id) {
+        throw new UnauthorizedError('User not authenticated');
+      }
       const result = await serviceService.getUserServiceHistory(
-        req.userId!,
+        req.user.id,
         req.query.serviceType as ServiceType | undefined,
         req.query.status as ExecutionStatus | undefined,
         parseInt(req.query.page as string) || 1,
@@ -196,7 +219,10 @@ export class ServiceController {
 
   async getMyHomeServices(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const services = await serviceService.getUserHomeServices(req.userId!);
+      if (!req.user?.id) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+      const services = await serviceService.getUserHomeServices(req.user.id);
 
       res.status(200).json({
         success: true,
@@ -210,7 +236,10 @@ export class ServiceController {
 
   async getMyHotspotServices(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const services = await serviceService.getUserHotspotServices(req.userId!);
+      if (!req.user?.id) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+      const services = await serviceService.getUserHotspotServices(req.user.id);
 
       res.status(200).json({
         success: true,
@@ -224,8 +253,11 @@ export class ServiceController {
 
   async getMyRechargeHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id) {
+        throw new UnauthorizedError('User not authenticated');
+      }
       const result = await serviceService.getUserRechargeHistory(
-        req.userId!,
+        req.user.id,
         parseInt(req.query.page as string) || 1,
         parseInt(req.query.limit as string) || 20
       );
@@ -243,8 +275,11 @@ export class ServiceController {
 
   async getMyElectricityHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id) {
+        throw new UnauthorizedError('User not authenticated');
+      }
       const result = await serviceService.getUserElectricityHistory(
-        req.userId!,
+        req.user.id,
         parseInt(req.query.page as string) || 1,
         parseInt(req.query.limit as string) || 20
       );
@@ -302,9 +337,12 @@ export class ServiceController {
 
   async adminManualExecute(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id) {
+        throw new UnauthorizedError('User not authenticated');
+      }
       const result = await serviceService.adminManualExecute(
         req.params.executionLogId,
-        req.userId!,
+        req.user.id,
         req.ipAddress,
         req.headers['user-agent']
       );
@@ -321,9 +359,12 @@ export class ServiceController {
 
   async adminManualRefund(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id) {
+        throw new UnauthorizedError('User not authenticated');
+      }
       const result = await serviceService.adminManualRefund(
         req.params.executionLogId,
-        req.userId!,
+        req.user.id,
         req.body.reason,
         req.ipAddress,
         req.headers['user-agent']
@@ -341,9 +382,12 @@ export class ServiceController {
 
   async adminReleaseHomeConnectionOwnership(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.id) {
+        throw new UnauthorizedError('User not authenticated');
+      }
       const result = await serviceService.adminReleaseHomeConnectionOwnership(
         req.body.connectionId,
-        req.userId!,
+        req.user.id,
         req.ipAddress,
         req.headers['user-agent']
       );

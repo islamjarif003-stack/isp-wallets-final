@@ -10,7 +10,6 @@ function BuyStbContent() {
   const packageId = searchParams.get('packageId') || '';
   const [pkg, setPkg] = useState<any>(null);
   const [stbNumber, setStbNumber] = useState('');
-  const [walletId, setWalletId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -33,32 +32,12 @@ function BuyStbContent() {
     fetchPackage();
   }, [packageId]);
 
-  // Fetch Wallet ID
-  useEffect(() => {
-    async function fetchWallet() {
-      try {
-        const token = getToken()!;
-        const res = await api('/wallet/balance', { token });
-        if (res.data?.walletId) {
-            setWalletId(res.data.walletId);
-        }
-      } catch (err) {
-        console.error("Failed to fetch wallet info", err);
-      }
-    }
-    fetchWallet();
-  }, []);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
-    if (!walletId) {
-        setError('Wallet information not found. Please refresh.');
-        setLoading(false);
-        return;
-    }
 
     try {
       const token = getToken()!;
@@ -68,7 +47,6 @@ function BuyStbContent() {
         body: {
           packageId,
           stbNumber,
-          walletId
         },
       });
       setSuccess(res.message || 'STB Service purchased successfully!');
@@ -141,7 +119,7 @@ function BuyStbContent() {
 
         <button 
             type="submit" 
-            disabled={loading || !pkg || !stbNumber || !walletId} 
+            disabled={loading || !pkg || !stbNumber} 
             className="btn-primary w-full"
         >
           {loading ? 'Processing...' : `Pay ৳${pkg?.price || 0}`}

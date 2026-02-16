@@ -4,11 +4,11 @@ import { ForbiddenError } from '../utils/errors';
 
 export function requireRoles(...roles: RoleName[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
-    if (!req.userRole) {
+    if (!req.user?.role) {
       return next(new ForbiddenError('Role not determined'));
     }
 
-    if (!roles.includes(req.userRole)) {
+    if (!roles.includes(req.user.role)) {
       return next(
         new ForbiddenError(
           `Access denied. Required roles: ${roles.join(', ')}`

@@ -7,7 +7,7 @@ export class WalletController {
   // ─── USER: Get my balance ────────────────────────────
   async getMyBalance(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await walletService.getBalanceByUserId(req.userId!);
+      const result = await walletService.getBalanceByUserId(req.user!.id);
 
       res.status(200).json({
         success: true,
@@ -23,7 +23,7 @@ export class WalletController {
   async getMyTransactions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await walletService.getTransactionHistory({
-        walletId: req.walletId!,
+        walletId: req.user!.walletId,
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 20,
         type: req.query.type as any,
@@ -47,7 +47,7 @@ export class WalletController {
   // ─── USER: Get my wallet summary ─────────────────────
   async getMyWalletSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await walletService.getWalletSummary(req.walletId!);
+      const result = await walletService.getWalletSummary(req.user!.walletId);
 
       res.status(200).json({
         success: true,
@@ -63,7 +63,7 @@ export class WalletController {
   async requestAddBalance(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await walletService.createAddBalanceRequest({
-        userId: req.userId!,
+        userId: req.user!.id,
         amount: req.body.amount,
         paymentMethod: req.body.paymentMethod,
         paymentReference: req.body.paymentReference,
@@ -99,7 +99,7 @@ export class WalletController {
       const limit = parseInt(req.query.limit as string) || 20;
       const status = req.query.status as string | undefined;
 
-      const result = await walletService.getBalanceRequests(req.userId!, status, page, limit);
+      const result = await walletService.getBalanceRequests(req.user!.id, status, page, limit);
 
       res.status(200).json({
         success: true,
@@ -117,7 +117,7 @@ export class WalletController {
     try {
       const result = await walletService.approveBalanceRequest({
         requestId: req.body.requestId,
-        adminId: req.userId!,
+        adminId: req.user!.id,
         adminNote: req.body.adminNote,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],
@@ -138,7 +138,7 @@ export class WalletController {
     try {
       await walletService.rejectBalanceRequest({
         requestId: req.body.requestId,
-        adminId: req.userId!,
+        adminId: req.user!.id,
         adminNote: req.body.adminNote,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],
@@ -182,7 +182,7 @@ export class WalletController {
         amount: req.body.amount,
         type: req.body.type,
         reason: req.body.reason,
-        adminId: req.userId!,
+        adminId: req.user!.id,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],
       });
@@ -202,7 +202,7 @@ export class WalletController {
     try {
       await walletService.freezeWallet(
         req.body.walletId,
-        req.userId!,
+        req.user!.id,
         req.body.reason,
         req.ipAddress,
         req.headers['user-agent']
@@ -222,7 +222,7 @@ export class WalletController {
     try {
       await walletService.unfreezeWallet(
         req.body.walletId,
-        req.userId!,
+        req.user!.id,
         req.body.reason,
         req.ipAddress,
         req.headers['user-agent']

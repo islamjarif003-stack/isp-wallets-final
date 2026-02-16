@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { HotspotService } from './hotspot.service';
-import { AppError } from '../../../utils/errors';
+import { logger } from '../../../utils/logger';
+import { UnauthorizedError } from '../../../utils/errors';
 
 const hotspotService = new HotspotService();
 
@@ -11,7 +12,7 @@ export class HotspotController {
 
   async addCards(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await hotspotService.addCards(req.body, req.userId!);
+      const result = await hotspotService.addCards(req.body, req.user!.id);
       res.status(201).json({
         success: true,
         message: 'Cards processed',
@@ -65,7 +66,7 @@ export class HotspotController {
       await hotspotService.updateCard(
         req.params.cardId,
         req.body.code,
-        req.userId!,
+        req.user!.id,
         req.body.password
       );
       res.status(200).json({ success: true, message: 'Card updated' });
@@ -78,7 +79,7 @@ export class HotspotController {
     try {
       await hotspotService.deleteCard(
         req.params.cardId,
-        req.userId!,
+        req.user!.id,
         req.body.password
       );
       res.status(200).json({ success: true, message: 'Card deleted' });
@@ -91,7 +92,7 @@ export class HotspotController {
     try {
       await hotspotService.deleteAllAvailableCards(
         req.body.packageId,
-        req.userId!,
+        req.user!.id,
         req.body.password
       );
       res.status(200).json({ success: true, message: 'All available cards deleted' });
@@ -102,7 +103,7 @@ export class HotspotController {
 
   async resetCard(req: Request, res: Response, next: NextFunction) {
     try {
-      await hotspotService.resetCard(req.params.cardId, req.userId!);
+      await hotspotService.resetCard(req.params.cardId, req.user!.id);
       res.status(200).json({
         success: true,
         message: 'Card reset successfully'
@@ -131,9 +132,14 @@ export class HotspotController {
 
   async purchaseHotspot(req: Request, res: Response, next: NextFunction) {
     try {
+      if (!req.user?.id || !req.user?.walletId) {
+        logger.warn('Auth data missing in service purchase', { path: req.path });
+        throw new UnauthorizedError('Authentication details are missing. Please log in again.');
+      }
+
       const result = await hotspotService.purchaseHotspot({
-        userId: req.userId!,
-        walletId: req.body.walletId,
+        userId: req.user.id,
+        walletId: req.user.walletId,
         packageId: req.body.packageId,
         mobileNumber: req.body.mobileNumber,
       });

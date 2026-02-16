@@ -8,5 +8,4 @@ export const addHotspotCardsSchema = z.object({
 export const purchaseHotspotSchema = z.object({
   packageId: z.string().uuid(),
   mobileNumber: z.string().regex(/^01\d{9}$/, 'Invalid mobile number'),
-  walletId: z.string().uuid(),
 });

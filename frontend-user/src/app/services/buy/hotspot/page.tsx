@@ -9,7 +9,6 @@ function BuyHotspotContent() {
   const packageId = searchParams.get('packageId') || '';
   const [pkg, setPkg] = useState<any>(null);
   const [mobileNumber, setMobileNumber] = useState('');
-  const [walletId, setWalletId] = useState('');
   const [stock, setStock] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,21 +27,12 @@ function BuyHotspotContent() {
       .then((res) => setStock(res.data.available))
       .catch(console.error);
 
-    api('/wallet/summary', { token })
-       .then(res => {
-           if (res.data?.walletId) setWalletId(res.data.walletId);
-       })
-      .catch(console.error);
+
   }, [packageId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
-    if (!walletId) {
-       setError('Wallet not found. Please contact support.');
-       return;
-    }
 
     setLoading(true);
     try {
@@ -54,7 +44,6 @@ function BuyHotspotContent() {
         body: {
           packageId,
           mobileNumber,
-          walletId
         },
       });
       setSuccess(res.message || 'Hotspot activated!');
