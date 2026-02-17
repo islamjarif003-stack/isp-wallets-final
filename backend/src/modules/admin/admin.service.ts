@@ -14,6 +14,7 @@ import {
   AssignRoleInput,
   UpdateSettingInput,
   ResetUserPasswordInput,
+  UpdateSupportChannelsInput,
 } from './admin.types';
 import { RoleName, Prisma } from '@prisma/account-wallet-client';
 
@@ -469,6 +470,56 @@ export class AdminService {
       previousValue,
       newValue: input.value,
       adminId: input.adminId,
+    });
+  }
+
+  async updateSupportChannels(input: UpdateSupportChannelsInput): Promise<void> {
+    const settingsToUpdate = [
+      { key: 'support_whatsapp_number', value: input.support_whatsapp_number },
+      { key: 'support_telegram_link', value: input.support_telegram_link },
+      { key: 'support_message_template', value: input.support_message_template },
+    ];
+
+    await this.walletDb.$transaction(async (tx) => {
+      for (const setting of settingsToUpdate) {
+        await tx.systemSetting.upsert({
+          where: { key: setting.key },
+          update: { value: setting.value, updatedBy: input.adminId },
+          create: {
+            key: setting.key,
+            value: setting.value,
+            updatedBy: input.adminId,
+            group: 'Support',
+            label: setting.key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+          },
+        });
+      }
+    });
+
+    // Invalidate Redis cache
+    if (isRedisAvailable()) {
+      try {
+        const redis = getRedis();
+        await redis.del(APP_CONSTANTS.REDIS_KEYS.SYSTEM_SETTINGS);
+      } catch (error) {
+        logger.warn('Failed to invalidate settings cache', { error });
+      }
+    }
+
+    await createAuditLog({
+      adminId: input.adminId,
+      action: 'SYSTEM_CONFIG_CHANGE',
+      resourceType: 'SYSTEM_SETTING',
+      resourceId: 'support_channels',
+      newData: input,
+      reason: 'Updated support channel settings',
+      ipAddress: input.ipAddress,
+      userAgent: input.userAgent,
+    });
+
+    logger.info('Support channel settings updated', {
+      adminId: input.adminId,
+      ...input,
     });
   }
 

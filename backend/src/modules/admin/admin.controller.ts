@@ -41,7 +41,7 @@ export class AdminController {
     try {
       await adminService.updateUserStatus({
         ...req.body,
-        adminId: req.userId!,
+        adminId: req.user!,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],
       });
@@ -55,7 +55,7 @@ export class AdminController {
     try {
       await adminService.assignRole({
         ...req.body,
-        adminId: req.userId!,
+        adminId: req.user!,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],
       });
@@ -79,11 +79,33 @@ export class AdminController {
     try {
       await adminService.updateSetting({
         ...req.body,
-        adminId: req.userId!,
+        adminId: req.user!,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],
       });
       res.status(200).json({ success: true, message: 'Setting updated' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateSupportChannels(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      await adminService.updateSupportChannels({
+        ...req.body,
+        adminId: req.user!.id,
+        ipAddress: req.ipAddress,
+        userAgent: req.get('user-agent') || 'unknown',
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Support channels updated',
+      });
     } catch (error) {
       next(error);
     }
@@ -119,7 +141,7 @@ export class AdminController {
       await adminService.resetUserPassword({
         userId: req.body.userId,
         newPassword: req.body.newPassword,
-        adminId: req.userId!,
+        adminId: req.user!,
         reason: req.body.reason,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],

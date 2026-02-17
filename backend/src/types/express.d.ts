@@ -6,7 +6,7 @@ declare global {
       user?: {
         id: string;
         role: RoleName;
-        walletId: string;
+        walletId?: string;
       };
       ipAddress?: string;
     }

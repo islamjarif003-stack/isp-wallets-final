@@ -9,6 +9,7 @@ const navItems = [
   { href: '/services', label: 'Services', icon: '⚡' },
   { href: '/wallet', label: 'Wallet', icon: '💰' },
   { href: '/history', label: 'History', icon: '📋' },
+  { href: '/support', label: 'Support', icon: '🎧' },
   { href: '/notifications', label: 'Alerts', icon: '🔔' },
 ];
 

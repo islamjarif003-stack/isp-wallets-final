@@ -10,6 +10,7 @@ import {
   userListQuerySchema,
   auditLogQuerySchema,
   resetUserPasswordSchema,
+  updateSupportChannelsSchema,
 } from './admin.validators';
 import { z } from 'zod';
 
@@ -29,6 +30,7 @@ router.post('/users/reset-password', requireSuperAdmin(), validateBody(resetUser
 
 router.get('/settings', controller.getSettings.bind(controller));
 router.put('/settings', validateBody(updateSettingSchema), controller.updateSetting.bind(controller));
+router.put('/settings/support-channels', validateBody(updateSupportChannelsSchema), controller.updateSupportChannels.bind(controller));
 
 router.get('/audit-logs', validateQuery(auditLogQuerySchema), controller.getAuditLogs.bind(controller));
 router.get('/roles', controller.getRoles.bind(controller));

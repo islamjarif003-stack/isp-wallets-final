@@ -1,3 +1,12 @@
+import { z } from 'zod';
+import { updateSupportChannelsSchema } from './admin.validators';
+
+export type UpdateSupportChannelsInput = z.infer<typeof updateSupportChannelsSchema> & {
+  adminId: string;
+  ipAddress?: string;
+  userAgent?: string;
+};
+
 export interface DashboardStats {
   totalUsers: number;
   activeUsers: number;

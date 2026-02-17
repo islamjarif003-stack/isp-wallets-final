@@ -1,5 +1,7 @@
 'use client';
 
+import SupportSettings from '@/components/SupportSettings';
+
 import { useEffect, useState } from 'react';
 import { api, getToken } from '@/lib/api';
 
@@ -89,6 +91,7 @@ export default function SettingsPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">System Settings</h1>
+      <SupportSettings />
 
       {loading ? (
         <div className="text-center py-8 text-gray-400">Loading...</div>

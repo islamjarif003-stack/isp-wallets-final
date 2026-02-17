@@ -23,6 +23,12 @@ export const updateSettingSchema = z.object({
   value: z.string().trim().min(0).max(1000),
 });
 
+export const updateSupportChannelsSchema = z.object({
+  support_whatsapp_number: z.string().trim().max(20),
+  support_telegram_link: z.string().trim().max(255),
+  support_message_template: z.string().trim().max(200),
+});
+
 export const userListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
