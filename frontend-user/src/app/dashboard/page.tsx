@@ -104,7 +104,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="px-4 pt-6">
+    <div className="w-full max-w-4xl mx-auto px-4 lg:px-6 pt-6 pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -120,24 +120,24 @@ export default function DashboardPage() {
             Logout
           </button>
           <Link href="/notifications" className="relative">
-            <span className="text-2xl">🔔</span>
+            <span className="text-3xl">🔔</span>
           </Link>
         </div>
       </div>
 
       {/* Balance Card */}
-      <div className="bg-gradient-to-br from-brand-600 to-brand-800 rounded-2xl p-6 text-white mb-6 shadow-lg">
+      <div className="bg-gradient-to-br from-brand-600 to-brand-800 rounded-2xl p-4 sm:p-6 text-white mb-6 shadow-lg">
         <p className="text-brand-200 text-sm mb-1">Available Balance</p>
         {loadingBalance ? (
           <div className="h-10 bg-white/20 rounded animate-pulse w-40"></div>
         ) : (
-          <h2 className="text-3xl font-bold">৳{balance.toLocaleString('en-BD', { minimumFractionDigits: 2 })}</h2>
+          <h2 className="text-4xl font-bold">৳{balance.toLocaleString('en-BD', { minimumFractionDigits: 2 })}</h2>
         )}
-        <div className="flex gap-3 mt-4">
-          <Link href="/wallet/add-balance" className="bg-white/20 hover:bg-white/30 backdrop-blur px-4 py-2 rounded-xl text-sm font-medium transition flex-1 text-center">
+        <div className="grid grid-cols-2 gap-3 mt-4">
+          <Link href="/wallet/add-balance" className="bg-white/20 hover:bg-white/30 backdrop-blur px-4 py-3 rounded-xl text-sm font-medium transition text-center">
             + Add Money
           </Link>
-          <Link href="/wallet" className="bg-white/20 hover:bg-white/30 backdrop-blur px-4 py-2 rounded-xl text-sm font-medium transition flex-1 text-center">
+          <Link href="/wallet" className="bg-white/20 hover:bg-white/30 backdrop-blur px-4 py-3 rounded-xl text-sm font-medium transition text-center">
             Transactions
           </Link>
         </div>
@@ -180,10 +180,10 @@ export default function DashboardPage() {
 
       {/* Quick Services */}
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Quick Services</h3>
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {quickServices.map((svc) => (
-          <Link key={svc.label} href={svc.href} className="flex flex-col items-center">
-            <div className={`w-14 h-14 ${svc.color} rounded-2xl flex items-center justify-center text-2xl mb-1`}>
+          <Link key={svc.label} href={svc.href} className="flex flex-col items-center text-center p-2 rounded-xl hover:bg-gray-50">
+            <div className={`w-16 h-16 ${svc.color} rounded-2xl flex items-center justify-center text-3xl mb-2`}>
               {svc.icon}
             </div>
             <span className="text-xs text-gray-600 font-medium">{svc.label}</span>
