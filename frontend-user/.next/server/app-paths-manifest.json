@@ -1,8 +1,0 @@
-{
-  "/dashboard/page": "app/dashboard/page.js",
-  "/history/page": "app/history/page.js",
-  "/services/page": "app/services/page.js",
-  "/notifications/page": "app/notifications/page.js",
-  "/services/buy/internet/page": "app/services/buy/internet/page.js",
-  "/services/buy/hotspot/page": "app/services/buy/hotspot/page.js"
-}

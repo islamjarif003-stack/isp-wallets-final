@@ -69,7 +69,7 @@ export const env = {
   SMS_GATEWAY_SENDER_ID: readString('SMS_GATEWAY_SENDER_ID'),
 
   CORS_ORIGIN_USER: readString('CORS_ORIGIN_USER', 'http://localhost:3000') || 'http://localhost:3000',
-  CORS_ORIGIN_ADMIN: readString('CORS_ORIGIN_ADMIN', 'http://localhost:3001') || 'http://localhost:3001',
+  CORS_ORIGIN_ADMIN: readString('CORS_ORIGIN_ADMIN', 'http://localhost:3002') || 'http://localhost:3002',
 
   RATE_LIMIT_WINDOW_MS: readNumber('RATE_LIMIT_WINDOW_MS', 15 * 60 * 1000),
   RATE_LIMIT_MAX: readNumber('RATE_LIMIT_MAX', 100),

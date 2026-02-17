@@ -13,7 +13,7 @@ export function applySecurityMiddleware(app: Express): void {
     cors({
       origin: [
         env.CORS_ORIGIN_USER || 'http://localhost:3000',
-        env.CORS_ORIGIN_ADMIN || 'http://localhost:3001',
+        env.CORS_ORIGIN_ADMIN || 'http://localhost:3002',
         'http://192.168.1.117:3000',
         'http://192.168.1.117:3001',
       ],
