@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { WalletService } from './wallet.service';
+import { UnauthorizedError } from '../../utils/errors';
 
 const walletService = new WalletService();
 
@@ -22,8 +23,11 @@ export class WalletController {
   // ─── USER: Get my transaction history ────────────────
   async getMyTransactions(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.user?.walletId) {
+        throw new UnauthorizedError('Wallet ID is missing for the authenticated user.');
+      }
       const result = await walletService.getTransactionHistory({
-        walletId: req.user!.walletId,
+        walletId: req.user.walletId,
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 20,
         type: req.query.type as any,
@@ -47,7 +51,10 @@ export class WalletController {
   // ─── USER: Get my wallet summary ─────────────────────
   async getMyWalletSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await walletService.getWalletSummary(req.user!.walletId);
+      if (!req.user?.walletId) {
+        throw new UnauthorizedError('Wallet ID is missing for the authenticated user.');
+      }
+      const result = await walletService.getWalletSummary(req.user.walletId);
 
       res.status(200).json({
         success: true,

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
+import { motion } from 'framer-motion';
 
 const navItems = [
   { href: '/dashboard', label: 'Home', icon: '🏠' },
@@ -22,19 +23,24 @@ export default function BottomNav() {
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + '/');
           return (
-            <Link
+            <motion.div
               key={item.href}
-              href={item.href}
+              whileTap={{ scale: 0.85 }}
               className={clsx(
                 'flex flex-col items-center py-1 px-3 rounded-lg transition-colors min-w-[60px]',
                 active ? 'text-brand-600' : 'text-gray-400'
               )}
             >
-              <span className="text-xl">{item.icon}</span>
-              <span className={clsx('text-[10px] mt-0.5 font-medium', active && 'text-brand-600')}>
-                {item.label}
-              </span>
-            </Link>
+              <Link
+                href={item.href}
+                className="flex flex-col items-center"
+              >
+                <span className="text-xl">{item.icon}</span>
+                <span className={clsx('text-[10px] mt-0.5 font-medium', active && 'text-brand-600')}>
+                  {item.label}
+                </span>
+              </Link>
+            </motion.div>
           );
         })}
       </div>

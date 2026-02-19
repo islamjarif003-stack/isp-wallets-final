@@ -41,7 +41,7 @@ export class AdminController {
     try {
       await adminService.updateUserStatus({
         ...req.body,
-        adminId: req.user!,
+        adminId: req.user!.id,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],
       });
@@ -55,7 +55,7 @@ export class AdminController {
     try {
       await adminService.assignRole({
         ...req.body,
-        adminId: req.user!,
+        adminId: req.user!.id,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],
       });
@@ -79,7 +79,7 @@ export class AdminController {
     try {
       await adminService.updateSetting({
         ...req.body,
-        adminId: req.user!,
+        adminId: req.user!.id,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],
       });
@@ -141,7 +141,7 @@ export class AdminController {
       await adminService.resetUserPassword({
         userId: req.body.userId,
         newPassword: req.body.newPassword,
-        adminId: req.user!,
+        adminId: req.user!.id,
         reason: req.body.reason,
         ipAddress: req.ipAddress,
         userAgent: req.headers['user-agent'],

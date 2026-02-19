@@ -20,13 +20,23 @@ export const resetUserPasswordSchema = z.object({
 
 export const updateSettingSchema = z.object({
   key: z.string().trim().min(1).max(100),
-  value: z.string().trim().min(0).max(1000),
+
+  // ✅ accept string | number | boolean
+  value: z.union([
+    z.string().max(2000),
+    z.number(),
+    z.boolean(),
+  ]).transform((val) => {
+    // ✅ Always convert to string before saving
+    if (typeof val === 'string') return val;
+    return JSON.stringify(val);
+  }),
 });
 
 export const updateSupportChannelsSchema = z.object({
-  support_whatsapp_number: z.string().trim().max(20),
-  support_telegram_link: z.string().trim().max(255),
-  support_message_template: z.string().trim().max(200),
+  support_whatsapp_number: z.string().trim().max(50).default(''),
+  support_telegram_link: z.string().trim().max(500).default(''),
+  support_message_template: z.string().trim().max(500).default(''),
 });
 
 export const userListQuerySchema = z.object({

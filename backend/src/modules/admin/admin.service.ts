@@ -435,10 +435,10 @@ export class AdminService {
 
     const previousValue = setting.value;
 
-    await this.walletDb.systemSetting.update({
+    const updatedSetting = await this.walletDb.systemSetting.update({
       where: { key: input.key },
       data: {
-        value: input.value,
+        value: typeof input.value === 'string' ? input.value : JSON.stringify(input.value),
         updatedBy: input.adminId,
       },
     });
@@ -518,7 +518,6 @@ export class AdminService {
     });
 
     logger.info('Support channel settings updated', {
-      adminId: input.adminId,
       ...input,
     });
   }

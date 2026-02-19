@@ -89,7 +89,7 @@ export interface WalletTransactionResult {
 }
 
 export interface TransactionHistoryQuery {
-  walletId: string;
+  walletId?: string;
   page: number;
   limit: number;
   type?: TransactionType;

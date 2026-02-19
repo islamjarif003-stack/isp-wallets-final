@@ -105,9 +105,9 @@ export class NotificationService {
         return;
       }
 
-      gatewayUrl = map.get('sms_api_url');
-      gatewayApiKey = map.get('sms_api_key');
-      senderId = map.get('sms_sender_id');
+      gatewayUrl = map.get('sms_api_url') as string | undefined;
+      gatewayApiKey = map.get('sms_api_key') as string | undefined;
+      senderId = map.get('sms_sender_id') as string | undefined;
     }
 
     if (!gatewayUrl || !gatewayApiKey) {

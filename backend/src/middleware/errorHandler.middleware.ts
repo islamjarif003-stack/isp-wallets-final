@@ -15,7 +15,7 @@ export function errorHandler(
     stack: env.isDevelopment() ? err.stack : undefined,
     path: req.path,
     method: req.method,
-    userId: req.userId,
+    userId: req.user?.id,
     ip: req.ip,
   });
 

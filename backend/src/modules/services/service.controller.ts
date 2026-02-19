@@ -87,12 +87,14 @@ export class ServiceController {
         throw new UnauthorizedError('Authentication details are missing. Please log in again.');
       }
 
+      const { packageId, connectionId, subscriberName, address } = req.body;
       const result = await serviceService.purchaseHomeInternet({
         userId: req.user.id,
         walletId: req.user.walletId,
-        packageId: req.body.packageId,
-        connectionId: req.body.connectionId,
-        ipAddress: req.ipAddress,
+        packageId,
+        connectionId,
+        subscriberName,
+        address: address || req.ipAddress,
       });
 
       const statusCode = result.status === 'COMPLETED' ? 200 : 202;
@@ -350,7 +352,7 @@ export class ServiceController {
       res.status(200).json({
         success: true,
         message: result.message,
-        data: result.data,
+        data: result,
       });
     } catch (error) {
       next(error);
@@ -395,7 +397,7 @@ export class ServiceController {
       res.status(200).json({
         success: true,
         message: result.message,
-        data: result.data,
+        data: (result as { data?: any }).data,
       });
     } catch (error) {
       next(error);

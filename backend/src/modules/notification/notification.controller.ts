@@ -8,7 +8,7 @@ export class NotificationController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
-      const result = await notificationService.getUserNotifications(req.userId!, page, limit);
+      const result = await notificationService.getUserNotifications(req.user!.id, page, limit);
 
       res.status(200).json({
         success: true,
@@ -24,7 +24,7 @@ export class NotificationController {
 
   async getUnreadCount(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const count = await notificationService.getUnreadCount(req.userId!);
+      const count = await notificationService.getUnreadCount(req.user!.id);
       res.status(200).json({
         success: true,
         data: { unreadCount: count },
@@ -36,7 +36,7 @@ export class NotificationController {
 
   async markAsRead(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      await notificationService.markAsRead(req.params.notificationId, req.userId!);
+      await notificationService.markAsRead(req.params.notificationId, req.user!.id);
       res.status(200).json({
         success: true,
         message: 'Notification marked as read',
@@ -48,7 +48,7 @@ export class NotificationController {
 
   async markAllAsRead(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      await notificationService.markAllAsRead(req.userId!);
+      await notificationService.markAllAsRead(req.user!.id);
       res.status(200).json({
         success: true,
         message: 'All notifications marked as read',

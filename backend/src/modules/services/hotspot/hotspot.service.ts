@@ -3,7 +3,7 @@ import { WalletService } from '../../wallet/wallet.service';
 import { withLock } from '../../../utils/distributed-lock';
 import { generateIdempotencyKey } from '../../../utils/idempotency';
 import { logger } from '../../../utils/logger';
-import { AppError, NotFoundError, InsufficientBalanceError } from '../../../utils/errors';
+import { AppError, NotFoundError, InsufficientBalanceError, ForbiddenError, ConflictError } from '../../../utils/errors';
 import { CreateHotspotCardInput, PurchaseHotspotInput, HotspotCardStats } from './hotspot.types';
 import { createAuditLog } from '../../../utils/audit';
 import { notifyServicePurchased, notifyServiceCompleted, notifyServiceFailed } from '../../notification/notification.queue';
@@ -396,11 +396,10 @@ export class HotspotService {
 
         // REFUND LOGIC
         if (walletTxId) {
-           await this.walletService.processRefund({
+           await this.walletService.refundTransaction({
              originalTransactionId: walletTxId,
              reason: 'Service execution failed: ' + error.message,
-             amount: parseFloat(pkg.price.toString()), // Full refund
-             userId: input.userId
+             initiatedBy: input.userId,
            });
            
            await this.serviceDb.serviceExecutionLog.update({

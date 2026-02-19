@@ -467,7 +467,19 @@ export class WalletService {
 
     return refundResult;
   }
-
+  
+// ✅ Compatibility method for services (Hotspot / Service refund)
+     async processRefund(input: {
+  walletId: string;
+  amount: number;
+  reference: string;
+}) {
+  return this.refundTransaction({
+    originalTransactionId: input.reference,
+    reason: 'Service refund',
+    initiatedBy: 'SYSTEM',
+  });
+}
   // ═══════════════════════════════════════════════════════════════
   // ADMIN ADJUSTMENT
   // ═══════════════════════════════════════════════════════════════
