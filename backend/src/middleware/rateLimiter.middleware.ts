@@ -1,8 +1,8 @@
 import rateLimit from 'express-rate-limit';
-import { getRedis, isRedisAvailable } from '../config/redis';
+import { redisConnection } from '../config/redis';
 import { env } from '../config/env';
 import { APP_CONSTANTS } from '../config/constants';
-import { logger } from '../utils/logger';
+import { getLogger } from '../utils/logger';
 
 function normalizeIp(ip: string): string {
   const v = (ip || '').trim();
@@ -73,11 +73,7 @@ export async function checkRedisRateLimit(
   maxAttempts: number,
   windowSeconds: number
 ): Promise<{ allowed: boolean; remaining: number; resetIn: number }> {
-  if (!isRedisAvailable()) {
-    return { allowed: true, remaining: maxAttempts, resetIn: 0 };
-  }
-
-  const redis = getRedis();
+  const redis = redisConnection;
   const redisKey = APP_CONSTANTS.REDIS_KEYS.RATE_LIMIT(key);
 
   try {
@@ -96,7 +92,7 @@ export async function checkRedisRateLimit(
       resetIn: ttl,
     };
   } catch (error) {
-    logger.error('Redis rate limit check failed', { key, error });
+    getLogger().error('Redis rate limit check failed', { key, error });
     return { allowed: true, remaining: maxAttempts, resetIn: 0 };
   }
 }

@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { getAccountWalletDb } from '../../config/database';
 import { env } from '../../config/env';
-import { logger } from '../../utils/logger';
+import { getLogger } from '../../utils/logger';
 import { sanitizeMobile } from '../../utils/helpers';
 import { OtpService } from '../otp/otp.service';
 import {
@@ -26,6 +26,7 @@ import { RoleName } from '@prisma/account-wallet-client';
 export class AuthService {
   private db = getAccountWalletDb();
   private otpService = new OtpService();
+  private logger = getLogger();
 
   async signupRequestOtp(
     input: SignupRequestOtpInput,
@@ -136,7 +137,7 @@ export class AuthService {
       walletId: result.wallet.id,
     });
 
-    logger.info('User signup completed', {
+    this.logger.info('User signup completed', {
       userId: result.user.id,
       mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
     });
@@ -222,7 +223,7 @@ export class AuthService {
       walletId: wallet.id,
     });
 
-    logger.info('User logged in', {
+    this.logger.info('User logged in', {
       userId: user.id,
       role: user.role.name,
     });
@@ -306,7 +307,7 @@ export class AuthService {
       data: { passwordHash },
     });
 
-    logger.info('Password reset successful', {
+    this.logger.info('Password reset successful', {
       userId: user.id,
       mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
     });

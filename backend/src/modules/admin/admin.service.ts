@@ -1,9 +1,9 @@
-import { getAccountWalletDb } from '../../config/database';
-import { getServiceDb } from '../../config/database';
-import { logger } from '../../utils/logger';
+import { getAccountWalletDb, getServiceDb } from '../../config/database';
+import { getLogger } from '../../utils/logger';
 import { createAuditLog } from '../../utils/audit';
 import { paginationMeta } from '../../utils/helpers';
-import { getRedis, isRedisAvailable } from '../../config/redis';
+import { redisConnection } from '../../config/redis';
+import { env } from '../../config/env';
 import { APP_CONSTANTS } from '../../config/constants';
 import { AppError, NotFoundError, ConflictError, ForbiddenError } from '../../utils/errors';
 import bcrypt from 'bcrypt';
@@ -21,6 +21,7 @@ import { RoleName, Prisma } from '@prisma/account-wallet-client';
 export class AdminService {
   private walletDb = getAccountWalletDb();
   private serviceDb = getServiceDb();
+  private logger = getLogger();
 
   // ═══════════════════════════════════════════════════════════════
   // DASHBOARD STATS
@@ -307,7 +308,7 @@ export class AdminService {
       userAgent: input.userAgent,
     });
 
-    logger.info('User status updated', {
+    this.logger.info('User status updated', {
       userId: input.userId,
       previousStatus,
       newStatus: input.status,
@@ -357,7 +358,7 @@ export class AdminService {
       userAgent: input.userAgent,
     });
 
-    logger.info('User role assigned', {
+    this.logger.info('User role assigned', {
       userId: input.userId,
       previousRole,
       newRole: input.roleName,
@@ -402,7 +403,7 @@ export class AdminService {
       userAgent: input.userAgent,
     });
 
-    logger.info('User password reset by admin', {
+    this.logger.info('User password reset by admin', {
       userId: input.userId,
       adminId: input.adminId,
     });
@@ -444,12 +445,12 @@ export class AdminService {
     });
 
     // Invalidate Redis cache
-    if (isRedisAvailable()) {
+    if (env.REDIS_ENABLED) {
       try {
-        const redis = getRedis();
+        const redis = redisConnection;
         await redis.del(APP_CONSTANTS.REDIS_KEYS.SYSTEM_SETTINGS);
       } catch (error) {
-        logger.warn('Failed to invalidate settings cache', { error });
+        this.logger.warn('Failed to invalidate settings cache', { error });
       }
     }
 
@@ -465,7 +466,7 @@ export class AdminService {
       userAgent: input.userAgent,
     });
 
-    logger.info('System setting updated', {
+    this.logger.info('System setting updated', {
       key: input.key,
       previousValue,
       newValue: input.value,
@@ -497,12 +498,12 @@ export class AdminService {
     });
 
     // Invalidate Redis cache
-    if (isRedisAvailable()) {
+    if (env.REDIS_ENABLED) {
       try {
-        const redis = getRedis();
+        const redis = redisConnection;
         await redis.del(APP_CONSTANTS.REDIS_KEYS.SYSTEM_SETTINGS);
       } catch (error) {
-        logger.warn('Failed to invalidate settings cache', { error });
+        this.logger.warn('Failed to invalidate settings cache', { error });
       }
     }
 
@@ -517,7 +518,7 @@ export class AdminService {
       userAgent: input.userAgent,
     });
 
-    logger.info('Support channel settings updated', {
+    this.logger.info('Support channel settings updated', {
       ...input,
     });
   }

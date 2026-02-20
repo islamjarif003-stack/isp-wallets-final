@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { HotspotService } from './hotspot.service';
-import { logger } from '../../../utils/logger';
+import { getLogger } from '../../../utils/logger';
+const logger = getLogger();
 import { UnauthorizedError } from '../../../utils/errors';
 
 const hotspotService = new HotspotService();

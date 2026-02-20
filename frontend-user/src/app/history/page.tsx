@@ -1,8 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { api, getToken } from '@/lib/api';
 import { copyText } from '@/lib/copy';
+
+// Custom hook for polling
+function useInterval(callback: () => void, delay: number | null) {
+  const savedCallback = useRef<() => void>();
+
+  useEffect(() => {
+    savedCallback.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    function tick() {
+      if (savedCallback.current) {
+        savedCallback.current();
+      }
+    }
+    if (delay !== null) {
+      const id = setInterval(tick, delay);
+      return () => clearInterval(id);
+    }
+  }, [delay]);
+}
 
 export default function HistoryPage() {
   const [services, setServices] = useState<any[]>([]);
@@ -12,31 +33,53 @@ export default function HistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copied, setCopied] = useState<string>('');
+  const [isPolling, setIsPolling] = useState(false);
 
-  useEffect(() => {
-    async function fetchHistory() {
+  async function fetchHistory() {
+    // Don't set loading to true if we are just polling
+    if (!isPolling) {
       setLoading(true);
-      setError(null);
-      try {
-        const token = getToken();
-        if (!token) {
-          setServices([]);
-          setMeta(null);
-          setError('Please log in to view your service history.');
-          return;
-        }
-        const res = await api('/services/history', { token, params: { page: String(page), limit: '15' } });
-        setServices(res.data);
-        setMeta(res.meta);
-      } catch (err) {
+    }
+    setError(null);
+    try {
+      const token = getToken();
+      if (!token) {
         setServices([]);
         setMeta(null);
-        setError(err instanceof Error ? err.message : 'Failed to load service history');
+        setError('Please log in to view your service history.');
+        return;
       }
-      finally { setLoading(false); }
+      const res = await api('/services/history', { token, params: { page: String(page), limit: '15' } });
+      setServices(res.data);
+      setMeta(res.meta);
+
+      // Check if we need to continue polling
+      const shouldPoll = res.data.some((svc: any) => svc.status === 'PENDING' || svc.status === 'EXECUTING');
+      setIsPolling(shouldPoll);
+
+    } catch (err) {
+      setServices([]);
+      setMeta(null);
+      setError(err instanceof Error ? err.message : 'Failed to load service history');
+      setIsPolling(false); // Stop polling on error
     }
+    finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
     fetchHistory();
   }, [page]);
+
+  // Start or stop polling based on the isPolling state
+  useInterval(
+    () => {
+      fetchHistory();
+    },
+    isPolling ? 3000 : null // Poll every 3 seconds if isPolling is true
+  );
+
 
   const statusColors: Record<string, string> = {
     COMPLETED: 'bg-green-100 text-green-700',
@@ -44,6 +87,7 @@ export default function HistoryPage() {
     REFUNDED: 'bg-purple-100 text-purple-700',
     PENDING: 'bg-yellow-100 text-yellow-700',
     EXECUTING: 'bg-blue-100 text-blue-700',
+    PROCESSING: 'bg-gray-100 text-gray-700',
   };
 
   const typeIcons: Record<string, string> = {
@@ -204,14 +248,6 @@ export default function HistoryPage() {
           ))
         )}
       </div>
-
-      {meta && (
-        <div className="flex justify-between mt-4">
-          <button disabled={!meta.hasPrev} onClick={() => setPage(page - 1)} className="px-4 py-2 text-sm bg-gray-100 rounded-xl disabled:opacity-30">← Prev</button>
-          <span className="text-xs text-gray-400 self-center">{page}/{meta.totalPages}</span>
-          <button disabled={!meta.hasNext} onClick={() => setPage(page + 1)} className="px-4 py-2 text-sm bg-gray-100 rounded-xl disabled:opacity-30">Next →</button>
-        </div>
-      )}
     </div>
   );
 }

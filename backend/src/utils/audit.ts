@@ -1,10 +1,11 @@
 import { getAccountWalletDb } from '../config/database';
+import { AuditAction } from '@prisma/account-wallet-client';
 
 export const audit = {};
 
 export type CreateAuditLogInput = {
   adminId: string;
-  action: string;
+  action: AuditAction;
   targetUserId?: string;
   resourceType?: string;
   resourceId?: string;

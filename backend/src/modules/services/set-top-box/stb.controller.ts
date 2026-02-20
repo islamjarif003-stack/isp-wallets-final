@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { StbService } from './stb.service';
-import { logger } from '../../../utils/logger';
+import { getLogger } from '../../../utils/logger';
 import { UnauthorizedError, AppError } from '../../../utils/errors';
 
 const stbService = new StbService();
 
 export class StbController {
+  private logger = getLogger();
   // ═══════════════════════════════════════════════════════════════
   // ADMIN
   // ═══════════════════════════════════════════════════════════════
@@ -92,7 +93,7 @@ export class StbController {
   async purchaseStbService(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.user?.id || !req.user?.walletId) {
-        logger.warn('Auth data missing in service purchase', { path: req.path });
+        this.logger.warn('Auth data missing in service purchase', { path: req.path });
         throw new UnauthorizedError('Authentication details are missing. Please log in again.');
       }
 

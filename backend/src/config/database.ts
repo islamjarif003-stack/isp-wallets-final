@@ -5,41 +5,28 @@ export const databaseConfig = {
   serviceUrl: env.SERVICE_DATABASE_URL,
 };
 
-let accountWalletDb: any | null = null;
-let serviceDb: any | null = null;
+import { PrismaClient as AccountWalletPrismaClient } from '@prisma/account-wallet-client';
+import { PrismaClient as ServicePrismaClient } from '@prisma/service-client';
 
-export function getAccountWalletDb(): any {
+let accountWalletDb: AccountWalletPrismaClient | null = null;
+let serviceDb: ServicePrismaClient | null = null;
+
+export function getAccountWalletDb(): AccountWalletPrismaClient {
   if (accountWalletDb) return accountWalletDb;
 
-  try {
-    const mod = require('@prisma/account-wallet-client');
-    const PrismaClient = mod.PrismaClient as any;
-    accountWalletDb = new PrismaClient({
-      datasources: { db: { url: databaseConfig.accountWalletUrl } },
-    });
-    return accountWalletDb;
-  } catch (error) {
-    throw new Error(
-      'Account-wallet Prisma client is missing. Generate @prisma/account-wallet-client before using getAccountWalletDb().'
-    );
-  }
+  accountWalletDb = new AccountWalletPrismaClient({
+    datasources: { db: { url: databaseConfig.accountWalletUrl } },
+  });
+  return accountWalletDb;
 }
 
-export function getServiceDb(): any {
+export function getServiceDb(): ServicePrismaClient {
   if (serviceDb) return serviceDb;
 
-  try {
-    const mod = require('@prisma/service-client');
-    const PrismaClient = mod.PrismaClient as any;
-    serviceDb = new PrismaClient({
-      datasources: { db: { url: databaseConfig.serviceUrl } },
-    });
-    return serviceDb;
-  } catch (error) {
-    throw new Error(
-      'Service Prisma client is missing. Generate @prisma/service-client before using getServiceDb().'
-    );
-  }
+  serviceDb = new ServicePrismaClient({
+    datasources: { db: { url: databaseConfig.serviceUrl } },
+  });
+  return serviceDb;
 }
 
 export async function connectDatabases(): Promise<void> {

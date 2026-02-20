@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { getAccountWalletDb } from '../config/database';
 import { UnauthorizedError } from '../utils/errors';
-import { logger } from '../utils/logger';
+import { getLogger } from '../utils/logger';
 import { RoleName } from '@prisma/account-wallet-client';
 
 interface JwtPayload {
@@ -17,6 +17,7 @@ export async function authMiddleware(
   _res: Response,
   next: NextFunction
 ): Promise<void> {
+  const logger = getLogger();
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

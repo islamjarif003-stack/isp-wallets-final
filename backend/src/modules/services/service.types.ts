@@ -1,5 +1,7 @@
+import { ServiceType, PackageStatus } from '@prisma/service-client';
+
 export type CreatePackageInput = {
-  serviceType: string;
+  serviceType: ServiceType;
   name: string;
   description?: string;
   price: number;
@@ -7,7 +9,7 @@ export type CreatePackageInput = {
   validity?: number;
   bandwidth?: string;
   dataLimit?: string;
-  status?: string;
+  status?: PackageStatus;
   metadata?: Record<string, any>;
   sortOrder?: number;
 };
@@ -59,3 +61,8 @@ export type ServiceExecutionResult = {
   refundTransactionId?: string;
   message: string;
 };
+
+export interface IServiceExecution {
+  id: string;
+  userId: string;
+}

@@ -1,7 +1,8 @@
 import bcrypt from 'bcrypt';
 import { getAccountWalletDb } from '../src/config/database';
 import { sanitizeMobile } from '../src/utils/helpers';
-import { logger } from '../src/utils/logger';
+import { getLogger } from '../src/utils/logger';
+const logger = getLogger();
 import { RoleName } from '@prisma/account-wallet-client';
 import { createAuditLog } from '../src/utils/audit';
  

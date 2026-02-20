@@ -1,12 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { ServiceService } from './service.service';
 import { ServiceType, ExecutionStatus } from '@prisma/service-client';
-import { logger } from '../../utils/logger';
+import { getLogger } from '../../utils/logger';
 import { UnauthorizedError } from '../../utils/errors';
 
 const serviceService = new ServiceService();
 
 export class ServiceController {
+  private logger = getLogger();
   // ═══════════ PACKAGES ═══════════
 
   async getPackages(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -83,7 +84,7 @@ export class ServiceController {
   async purchaseHomeInternet(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id || !req.user?.walletId) {
-        logger.warn('Auth data missing in service purchase', { path: req.path });
+        this.logger.warn('Auth data missing in service purchase', { path: req.path });
         throw new UnauthorizedError('Authentication details are missing. Please log in again.');
       }
 
@@ -112,7 +113,7 @@ export class ServiceController {
   async purchaseHotspot(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id || !req.user?.walletId) {
-        logger.warn('Auth data missing in service purchase', { path: req.path });
+        this.logger.warn('Auth data missing in service purchase', { path: req.path });
         throw new UnauthorizedError('Authentication details are missing. Please log in again.');
       }
 
@@ -139,7 +140,7 @@ export class ServiceController {
   async purchaseMobileRecharge(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id || !req.user?.walletId) {
-        logger.warn('Auth data missing in service purchase', { path: req.path });
+        this.logger.warn('Auth data missing in service purchase', { path: req.path });
         throw new UnauthorizedError('Authentication details are missing. Please log in again.');
       }
 
@@ -167,7 +168,7 @@ export class ServiceController {
   async purchaseElectricityBill(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id || !req.user?.walletId) {
-        logger.warn('Auth data missing in service purchase', { path: req.path });
+        this.logger.warn('Auth data missing in service purchase', { path: req.path });
         throw new UnauthorizedError('Authentication details are missing. Please log in again.');
       }
 

@@ -2,7 +2,7 @@ import { getServiceDb, getAccountWalletDb } from '../../../config/database';
 import { WalletService } from '../../wallet/wallet.service';
 import { withLock } from '../../../utils/distributed-lock';
 import { generateIdempotencyKey } from '../../../utils/idempotency';
-import { logger } from '../../../utils/logger';
+import { getLogger } from '../../../utils/logger';
 import { AppError, NotFoundError, ConflictError, InsufficientBalanceError } from '../../../utils/errors';
 import { CreateStbPackageInput, PurchaseStbInput, UpdateStbPackageStatusInput, UpdateStbPackageInput } from './stb.types';
 import { PackageStatus, ExecutionStatus } from '@prisma/service-client';
@@ -13,6 +13,7 @@ export class StbService {
   private serviceDb = getServiceDb();
   private walletDb = getAccountWalletDb();
   private walletService = new WalletService();
+  private logger = getLogger();
 
   // ═══════════════════════════════════════════════════════════════
   // PACKAGE MANAGEMENT (ADMIN)
@@ -28,7 +29,7 @@ export class StbService {
       },
     });
 
-    logger.info('STB Package created', { id: pkg.id, name: pkg.name });
+    this.logger.info('STB Package created', { id: pkg.id, name: pkg.name });
     return {
       ...pkg,
       price: parseFloat(pkg.price.toString()),
@@ -282,7 +283,7 @@ export class StbService {
       userAgent
     });
 
-    logger.info('STB ownership released by admin', {
+    this.logger.info('STB ownership released by admin', {
       adminId,
       stbNumber,
       previousUserId: existing.userId

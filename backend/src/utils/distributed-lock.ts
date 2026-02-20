@@ -1,4 +1,4 @@
-import { getRedis, isRedisAvailable } from '../config/redis';
+import { redisConnection } from '../config/redis';
 import { env } from '../config/env';
 import { generateIdempotencyKey } from './idempotency';
 import { AppError } from './errors';
@@ -20,7 +20,7 @@ export async function withLock<T>(
   fn: () => Promise<T>,
   options: LockOptions = {}
 ): Promise<T> {
-  if (!isRedisAvailable()) {
+  if (!env.REDIS_ENABLED) {
     return fn();
   }
 
@@ -28,7 +28,7 @@ export async function withLock<T>(
   const retryDelayMs = options.retryDelayMs ?? env.LOCK_RETRY_DELAY_MS;
   const retryCount = options.retryCount ?? env.LOCK_RETRY_COUNT;
 
-  const redis = getRedis();
+  const redis = redisConnection;
   const lockKey = `lock:${key}`;
   const token = generateIdempotencyKey();
 

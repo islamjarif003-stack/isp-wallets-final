@@ -1,5 +1,5 @@
 import { getAccountWalletDb } from '../../config/database';
-import { logger } from '../../utils/logger';
+import { getLogger } from '../../utils/logger';
 import { withLock } from '../../utils/distributed-lock';
 import { generateIdempotencyKey, generateTransactionId } from '../../utils/idempotency';
 import { createAuditLog } from '../../utils/audit';
@@ -23,6 +23,7 @@ import { TransactionCategory, TransactionType, Prisma } from '@prisma/account-wa
 
 export class WalletService {
   private db = getAccountWalletDb();
+  private logger = getLogger();
 
   // ═══════════════════════════════════════════════════════════════
   // BALANCE - ALWAYS DERIVED FROM wallet_transactions
@@ -53,7 +54,7 @@ export class WalletService {
 
     // Sync cached balance (non-blocking, for display optimization only)
     this.syncCachedBalance(walletId, balance).catch((err) => {
-      logger.warn('Failed to sync cached balance', { walletId, error: err.message });
+      this.logger.warn('Failed to sync cached balance', { walletId, error: err.message });
     });
 
     return {
@@ -166,7 +167,7 @@ export class WalletService {
         });
 
         if (existingByKey) {
-          logger.warn('Duplicate idempotency key detected for debit', {
+          this.logger.warn('Duplicate idempotency key detected for debit', {
             idempotencyKey: input.idempotencyKey,
             existingId: existingByKey.id,
           });
@@ -261,7 +262,7 @@ export class WalletService {
           },
         });
 
-        logger.info('Wallet debited successfully', {
+        this.logger.info('Wallet debited successfully', {
           transactionId: transaction.id,
           walletId: input.walletId,
           amount: input.amount,
@@ -294,7 +295,7 @@ export class WalletService {
         });
 
         if (existingByKey) {
-          logger.warn('Duplicate idempotency key detected for credit', {
+          this.logger.warn('Duplicate idempotency key detected for credit', {
             idempotencyKey: input.idempotencyKey,
             existingId: existingByKey.id,
           });
@@ -330,7 +331,7 @@ export class WalletService {
         // Frozen wallets CAN receive credits (e.g., refunds)
         // but we log a warning
         if (wallet.status === 'FROZEN') {
-          logger.warn('Crediting frozen wallet', {
+          this.logger.warn('Crediting frozen wallet', {
             walletId: input.walletId,
             amount: input.amount,
             category: input.category,
@@ -379,7 +380,7 @@ export class WalletService {
           },
         });
 
-        logger.info('Wallet credited successfully', {
+        this.logger.info('Wallet credited successfully', {
           transactionId: transaction.id,
           walletId: input.walletId,
           amount: input.amount,
@@ -413,6 +414,7 @@ export class WalletService {
       throw new AppError('Can only refund debit transactions', 400);
     }
 
+    this.logger.debug('Checking originalTx status for refund', { transactionId: originalTx.id, status: originalTx.status });
     if (originalTx.status !== 'COMPLETED') {
       throw new AppError('Can only refund completed transactions', 400);
     }
@@ -423,7 +425,7 @@ export class WalletService {
     });
 
     if (existingRefund) {
-      logger.warn('Refund already processed', {
+      this.logger.warn('Refund already processed', {
         originalTransactionId: input.originalTransactionId,
         refundTransactionId: existingRefund.id,
       });
@@ -458,7 +460,7 @@ export class WalletService {
       },
     });
 
-    logger.info('Refund processed successfully', {
+    this.logger.info('Refund processed successfully', {
       originalTransactionId: input.originalTransactionId,
       refundTransactionId: refundResult.transactionId,
       refundAmount,
@@ -640,7 +642,7 @@ export class WalletService {
         },
       });
 
-      logger.info('Balance add request created', {
+      this.logger.info('Balance add request created', {
         requestId: request.id,
         userId: input.userId,
         amount: input.amount,
@@ -752,7 +754,7 @@ export class WalletService {
       userAgent: input.userAgent,
     });
 
-    logger.info('Balance request approved', {
+    this.logger.info('Balance request approved', {
       requestId: request.id,
       userId: request.userId,
       amount: baseAmount,
@@ -803,7 +805,7 @@ export class WalletService {
       userAgent: input.userAgent,
     });
 
-    logger.info('Balance request rejected', {
+    this.logger.info('Balance request rejected', {
       requestId: request.id,
       userId: request.userId,
       reason: input.adminNote,
@@ -889,7 +891,7 @@ export class WalletService {
       userAgent,
     });
 
-    logger.info('Wallet frozen', { walletId, adminId, reason });
+    this.logger.info('Wallet frozen', { walletId, adminId, reason });
   }
 
   async unfreezeWallet(
@@ -929,7 +931,7 @@ export class WalletService {
       userAgent,
     });
 
-    logger.info('Wallet unfrozen', { walletId, adminId, reason });
+    this.logger.info('Wallet unfrozen', { walletId, adminId, reason });
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1046,13 +1048,13 @@ export class WalletService {
       });
 
       if (!setting) {
-        logger.warn('Commission percentage not found in settings, using default 0');
+        this.logger.warn('Commission percentage not found in settings, using default 0');
         return 0;
       }
 
       const percentage = parseFloat(setting.value);
       if (isNaN(percentage) || percentage < 0 || percentage > 100) {
-        logger.warn('Invalid commission percentage in settings', {
+        this.logger.warn('Invalid commission percentage in settings', {
           value: setting.value,
         });
         return 0;
@@ -1060,7 +1062,7 @@ export class WalletService {
 
       return percentage;
     } catch (error) {
-      logger.error('Error fetching commission percentage', { error });
+      this.logger.error('Error fetching commission percentage', { error });
       return 0;
     }
   }
@@ -1081,7 +1083,7 @@ export class WalletService {
 
       const percentage = parseFloat(setting.value);
       if (isNaN(percentage) || percentage < 0 || percentage > 100) {
-        logger.warn('Invalid topup bonus percent in settings', {
+        this.logger.warn('Invalid topup bonus percent in settings', {
           value: setting.value,
         });
         return 0;
@@ -1089,7 +1091,7 @@ export class WalletService {
 
       return percentage;
     } catch (error) {
-      logger.error('Error fetching topup bonus percent', { error });
+      this.logger.error('Error fetching topup bonus percent', { error });
       return 0;
     }
   }

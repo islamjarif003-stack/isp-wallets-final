@@ -1,7 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { ISP_RENEWAL_QUEUE_NAME } from '../queues/ispRenewal.queue';
 import { redisConnection } from '../config/redis';
-import { serviceDb } from '../config/database'; // Import Prisma client
+import { getServiceDb } from '../config/database'; // Import Prisma client
 import { chromium, Browser, Page } from 'playwright';
 
 // ... (rest of the file)
@@ -17,18 +17,20 @@ interface IspRenewalJobData {
 // ... (imports)
 
 const processIspRenewal = async (job: Job<IspRenewalJobData>) => {
+  console.log(`Worker received job ${job.id} for client: ${job.data.clientId}`);
   const { executionLogId, clientId, amount, packageName } = job.data;
   console.log(`Processing ISP renewal for client: ${clientId}, amount: ${amount}`);
 
-  await serviceDb.serviceExecutionLog.update({
+  await getServiceDb().serviceExecutionLog.update({
     where: { id: executionLogId },
     data: { status: 'PROCESSING', startedAt: new Date() },
   });
 
   let browser: Browser | null = null;
+  let page: Page | null = null;
   try {
     browser = await chromium.launch({ headless: process.env.NODE_ENV === 'production' });
-    const page = await browser.newPage();
+    page = await browser.newPage();
 
     // 1. Login to ISP Portal
     await loginToIspPortal(page);
@@ -41,7 +43,7 @@ const processIspRenewal = async (job: Job<IspRenewalJobData>) => {
 
     if (renewalSuccess) {
       console.log(`Successfully renewed for client: ${clientId}`);
-      await serviceDb.serviceExecutionLog.update({
+      await getServiceDb().serviceExecutionLog.update({
         where: { id: executionLogId },
         data: {
           status: 'COMPLETED',
@@ -58,15 +60,12 @@ const processIspRenewal = async (job: Job<IspRenewalJobData>) => {
     console.error(`Error processing job ${job.id} for client ${clientId}:`, error.message);
     const screenshotPath = `error_screenshot_${job.id}.png`;
     // Optional: Take a screenshot on failure
-    if (browser) {
-      const page = (await browser.pages())[0];
-      if (page) {
-        await page.screenshot({ path: screenshotPath });
-      }
+    if (page) {
+      await page.screenshot({ path: screenshotPath });
     }
     
     // Update execution log with FAILED status and error message
-    await serviceDb.serviceExecutionLog.update({
+    await getServiceDb().serviceExecutionLog.update({
       where: { id: executionLogId },
       data: {
         status: 'FAILED',
@@ -117,7 +116,7 @@ async function loginToIspPortal(page: Page) {
 
 async function getSubscriptionId(page: Page, clientId: string): Promise<string> {
   // 1. Check our database first
-  const existingMap = await serviceDb.ispClientMap.findUnique({
+  const existingMap = await getServiceDb().ispClientMap.findUnique({
     where: { clientId },
   });
 
@@ -128,7 +127,7 @@ async function getSubscriptionId(page: Page, clientId: string): Promise<string> 
 
   // 2. If not found, scrape it from the ISP panel
   console.log(`No mapping found for clientId: ${clientId}. Scraping from ISP panel...`);
-  await serviceDb.serviceExecutionLog.updateMany({
+  await getServiceDb().serviceExecutionLog.updateMany({
     where: { requestPayload: { path: ['clientId'], equals: clientId } },
     data: { status: 'MAPPING_CLIENT' },
   });
@@ -149,30 +148,53 @@ async function getSubscriptionId(page: Page, clientId: string): Promise<string> 
 
   console.log(`Searching for client ID: ${clientId}`);
   await page.fill(searchInputSelector, clientId);
-  // Some search boxes automatically trigger search. We will wait for the result directly.
-  // If your panel requires a button click, uncomment the next line.
-  // await page.click(searchButtonSelector);
+  await page.click(searchButtonSelector);
 
-  console.log(`Waiting for client link to appear with selector: ${clientLinkSelector}`);
-  await page.waitForSelector(clientLinkSelector, { timeout: 15000 });
+  // Wait for navigation to client-info.php or client-accounts.php
+  await page.waitForURL(url => url.toString().includes('client-info.php') || url.toString().includes('client-accounts.php'), { timeout: 15000 });
 
-  const clientLink = await page.getAttribute(clientLinkSelector, 'href');
-  if (!clientLink) {
-    throw new Error(`Could not find href attribute for selector: ${clientLinkSelector}`);
+  const currentUrl = page.url();
+  let subscriptionId: string | null = null;
+
+  if (currentUrl.includes('client-info.php')) {
+    // If redirected directly to client-info.php, extract subscriptionId from URL
+    const urlParams = new URLSearchParams(new URL(currentUrl).search);
+    subscriptionId = urlParams.get('subscriptionId');
+    if (!subscriptionId) {
+      throw new Error(`Could not extract subscriptionId from URL: ${currentUrl}`);
+    }
+    console.log(`Extracted subscriptionId from URL: ${subscriptionId}`);
+  } else if (currentUrl.includes('client-accounts.php')) {
+    // If still on client-accounts.php, then search results are in a table
+    const clientLinkSelector = '#client-table-body > tr:first-child > td:nth-child(3) > a'; // <-- VERIFY THIS
+    console.log(`Waiting for client link to appear with selector: ${clientLinkSelector}`);
+    await page.waitForSelector(clientLinkSelector, { timeout: 15000 });
+
+    const clientLink = await page.getAttribute(clientLinkSelector, 'href');
+    if (!clientLink) {
+      throw new Error(`Could not find href attribute for selector: ${clientLinkSelector}`);
+    }
+
+    // Extract subscriptionId from the URL (e.g., from 'client-renew.php?subscriptionId=375510')
+    const urlParams = new URLSearchParams(clientLink);
+    subscriptionId = urlParams.get('subscriptionId');
+
+    if (!subscriptionId) {
+      throw new Error(`Could not extract subscriptionId from link: ${clientLink}`);
+    }
+    console.log(`Extracted subscriptionId from link: ${clientLink}`);
+  } else {
+    throw new Error(`Unexpected page after client search: ${currentUrl}`);
   }
 
-  // Extract subscriptionId from the URL (e.g., from 'client-renew.php?subscriptionId=375510')
-  const urlParams = new URLSearchParams(clientLink);
-  const subscriptionId = urlParams.get('subscriptionId');
-
   if (!subscriptionId) {
-    throw new Error(`Could not extract subscriptionId from link: ${clientLink}`);
+    throw new Error('Subscription ID not found after client search.');
   }
 
   console.log(`Extracted subscriptionId: ${subscriptionId}`);
 
   // 3. Save the new mapping to our database
-  await serviceDb.ispClientMap.create({
+  await getServiceDb().ispClientMap.create({
     data: {
       clientId,
       subscriptionId,
@@ -186,11 +208,10 @@ async function getSubscriptionId(page: Page, clientId: string): Promise<string> 
 async function renewClient(page: Page, subscriptionId: string, packageName: string): Promise<boolean> {
   // This workflow directly navigates to the client renewal page.
 
-  const clientRenewUrl = `${process.env.ISP_PORTAL_URL.replace('/login.php', '')}/client-renew.php?subscriptionId=${subscriptionId}`;
-  console.log(`Navigating directly to client renewal page: ${clientRenewUrl}`);
+  const clientRenewUrl = `${process.env.ISP_PORTAL_URL?.replace('/login.php', '')}/client-renew.php?subscriptionId=${subscriptionId}`;  console.log(`Navigating directly to client renewal page: ${clientRenewUrl}`);
   await page.goto(clientRenewUrl);
 
-  await serviceDb.serviceExecutionLog.updateMany({
+  await getServiceDb().serviceExecutionLog.updateMany({
     where: { requestPayload: { path: ['subscriptionId'], equals: subscriptionId } },
     data: { status: 'RENEWING' },
   });
@@ -202,11 +223,11 @@ async function renewClient(page: Page, subscriptionId: string, packageName: stri
   const renewButtonSelector = 'button[name="renew"]'; // <-- VERIFY THIS
   const successMessageText = 'client renewed successfully'; // <-- VERIFY THIS
 
-  console.log(`Waiting for plan dropdown: ${planDropdownSelector}`);
-  await page.waitForSelector(planDropdownSelector);
+  // console.log(`Waiting for plan dropdown: ${planDropdownSelector}`);
+  // await page.waitForSelector(planDropdownSelector);
 
-  console.log(`Selecting package: ${packageName}`);
-  await page.selectOption(planDropdownSelector, { label: packageName });
+  // console.log(`Selecting package: ${packageName}`);
+  // await page.selectOption(planDropdownSelector, { label: packageName });
 
   if (await page.isChecked(sendSmsCheckboxSelector)) {
     console.log('Unchecking "Send SMS" box...');
@@ -216,7 +237,7 @@ async function renewClient(page: Page, subscriptionId: string, packageName: stri
   console.log(`Clicking the renew button: ${renewButtonSelector}`);
   await page.click(renewButtonSelector);
 
-  await serviceDb.serviceExecutionLog.updateMany({
+  await getServiceDb().serviceExecutionLog.updateMany({
     where: { requestPayload: { path: ['subscriptionId'], equals: subscriptionId } },
     data: { status: 'VERIFYING' },
   });
@@ -250,5 +271,5 @@ ispRenewalWorker.on('completed', (job, result) => {
 });
 
 ispRenewalWorker.on('failed', (job, err) => {
-  console.error(`Job ${job.id} failed with error:`, err.message);
+  console.error(`Job ${job?.id} failed with error:`, err.message);
 });

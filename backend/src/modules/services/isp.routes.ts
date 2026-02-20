@@ -11,7 +11,7 @@ const ispController = new IspController();
 router.get(
   '/logs',
   auth,
-  rbac([Role.ADMIN, Role.SUPPORT]),
+  rbac(Role.ADMIN),
   ispController.getIspLogs
 );
 
@@ -19,7 +19,7 @@ router.get(
 router.post(
   '/logs/:logId/retry',
   auth,
-  rbac([Role.ADMIN]),
+  rbac(Role.ADMIN),
   ispController.retryIspJob
 );
 

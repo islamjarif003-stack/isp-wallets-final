@@ -1,5 +1,5 @@
 import { getAccountWalletDb } from '../../config/database';
-import { logger } from '../../utils/logger';
+import { getLogger } from '../../utils/logger';
 import { withRetry } from '../../utils/retry';
 import { env } from '../../config/env';
 import { NotificationPayload, NotificationType, SmsPayload } from './notification.types';
@@ -8,6 +8,7 @@ import { paginationMeta } from '../../utils/helpers';
 
 export class NotificationService {
   private db = getAccountWalletDb();
+  private logger = getLogger();
   private smsQueue: SmsPayload[] = [];
   private processingInterval: NodeJS.Timeout | null = null;
 
@@ -29,13 +30,13 @@ export class NotificationService {
         },
       });
 
-      logger.info('Notification created', {
+      this.logger.info('Notification created', {
         userId: payload.userId,
         type: payload.type,
       });
     } catch (error) {
       // Non-blocking - notification failure should not crash
-      logger.error('Failed to create notification', {
+      this.logger.error('Failed to create notification', {
         userId: payload.userId,
         type: payload.type,
         error: error instanceof Error ? error.message : error,
@@ -63,7 +64,7 @@ export class NotificationService {
   // ─── Queue SMS (non-OTP, non-blocking) ───────────────
   async queueSms(mobile: string, message: string): Promise<void> {
     this.smsQueue.push({ mobile, message });
-    logger.debug('SMS queued', {
+    this.logger.debug('SMS queued', {
       mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
     });
   }
@@ -79,7 +80,7 @@ export class NotificationService {
         try {
           await this.sendSmsToGateway(sms);
         } catch (error) {
-          logger.error('SMS queue processing failed', {
+          this.logger.error('SMS queue processing failed', {
             mobile: sms.mobile.slice(0, 3) + '****' + sms.mobile.slice(-4),
             error: error instanceof Error ? error.message : error,
           });
@@ -101,7 +102,7 @@ export class NotificationService {
       const map = new Map(settings.map(s => [s.key, s.value]));
       
       if (map.get('sms_enabled') === 'false') {
-        logger.debug('SMS disabled in settings');
+        this.logger.debug('SMS disabled in settings');
         return;
       }
 
@@ -111,7 +112,7 @@ export class NotificationService {
     }
 
     if (!gatewayUrl || !gatewayApiKey) {
-      logger.debug('SMS gateway not configured, skipping SMS send');
+      this.logger.debug('SMS gateway not configured, skipping SMS send');
       return;
     }
 

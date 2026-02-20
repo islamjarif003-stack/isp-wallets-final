@@ -1,6 +1,7 @@
 import { getAccountWalletDb } from '../../config/database';
 import { getServiceDb } from '../../config/database';
-import { logger } from '../../utils/logger';
+import { getLogger } from '../../utils/logger';
+const logger = getLogger();
 import { Prisma } from '@prisma/account-wallet-client';
 
 export class ReportingService {

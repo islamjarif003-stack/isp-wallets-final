@@ -1,21 +1,29 @@
-import { logger } from '../../../utils/logger';
+import { getLogger } from '../../../utils/logger';
 import { AppError } from '../../../utils/errors';
 import { ispRenewalQueue } from '../../../queues/ispRenewal.queue';
-import { serviceDb } from '../../../config/database';
-import { IServiceExecution, ServiceExecutionLog } from '../service.types';
+import * as database from '@config/database';
+import { env } from '../../../config/env';
+import { IServiceExecution } from '../service.types';
+import { ExecutionStatus, ServiceType } from '@prisma/service-client';
+
+const logger = getLogger();
 
 export interface HomeInternetActivationInput {
   connectionId: string;
   packageName: string;
   subscriberName: string;
   amount: number;
+  bandwidth?: string;
+  validity?: string;
   execution: IServiceExecution;
 }
 
 export interface HomeInternetActivationResult {
   success: boolean;
   message: string;
-  log: ServiceExecutionLog;
+  log: any;
+  activatedAt?: Date;
+  expiresAt?: Date;
 }
 
 export async function executeHomeInternetActivation(
@@ -26,31 +34,29 @@ export async function executeHomeInternetActivation(
     packageName: input.packageName,
   });
 
-  // 1. Create an execution log
-  const log = await serviceDb.serviceExecutionLog.create({
-    data: {
-      serviceExecutionId: input.execution.id,
-      status: 'QUEUED',
-      requestPayload: input as any,
-    },
-  });
-
-  // 2. Add job to the queue
+  // 1. Add job to the queue using the existing execution log
   await ispRenewalQueue.add(
-    `renewal-${input.connectionId}-${log.id}`,
+    `renewal-${input.connectionId}-${input.execution.id}`,
     {
-      executionLogId: log.id,
+      executionLogId: input.execution.id,
       clientId: input.connectionId,
       amount: input.amount,
       packageName: input.packageName,
     }
   );
 
-  logger.info(`Job ${log.id} queued for connection ${input.connectionId}`);
+  await database.getServiceDb().serviceExecutionLog.update({
+    where: { id: input.execution.id },
+    data: {
+      status: ExecutionStatus.QUEUED,
+    },
+  });
+
+  logger.info(`Job ${input.execution.id} queued for connection ${input.connectionId}`);
 
   return {
     success: true,
     message: 'Your internet renewal request has been queued and will be processed shortly.',
-    log: log as any,
+    log: { ...input.execution, status: ExecutionStatus.QUEUED },
   };
 }

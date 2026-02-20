@@ -4,7 +4,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { getExcelReader } from './excel/excel-reader.service';
 import { withLock } from '../../utils/distributed-lock';
 import { generateIdempotencyKey, generateTransactionId } from '../../utils/idempotency';
-import { logger } from '../../utils/logger';
+import { getLogger } from '../../utils/logger';
 import { paginationMeta } from '../../utils/helpers';
 import { createAuditLog } from '../../utils/audit';
 import {
@@ -28,13 +28,14 @@ import { executeHomeInternetActivation } from './executors/home-internet.executo
 import { executeHotspotActivation } from './executors/hotspot.executor';
 import { executeMobileRecharge } from './executors/mobile-recharge.executor';
 import { executeElectricityPayment } from './executors/electricity.executor';
-import { ServiceType, ExecutionStatus } from '@prisma/service-client';
+import { ServiceType, ExecutionStatus, PackageStatus } from '@prisma/service-client';
 
 export class ServiceService {
   private serviceDb = getServiceDb();
   private walletDb = getAccountWalletDb();
   private walletService = new WalletService();
   private excelReader = getExcelReader();
+  private logger = getLogger();
 
   // ═══════════════════════════════════════════════════════════════
   // PACKAGE MANAGEMENT
@@ -48,7 +49,7 @@ export class ServiceService {
   ) {
     const where: any = {};
     if (serviceType) where.serviceType = serviceType;
-    if (!includeInactive) where.status = 'ACTIVE';
+    if (!includeInactive) where.status = PackageStatus.ACTIVE;
 
     const [packages, total] = await Promise.all([
       this.serviceDb.servicePackage.findMany({
@@ -116,12 +117,13 @@ export class ServiceService {
     }
 
     // Import to DB
-    let serviceType: ServiceType = 'HOME_INTERNET';
+    let serviceType: ServiceType = ServiceType.HOME_INTERNET;
     const typeMap: Record<string, ServiceType> = {
-      HOME_INTERNET: 'HOME_INTERNET',
-      HOTSPOT_WIFI: 'HOTSPOT_WIFI',
-      MOBILE_RECHARGE: 'MOBILE_RECHARGE',
-      ELECTRICITY_BILL: 'ELECTRICITY_BILL',
+      HOME_INTERNET: ServiceType.HOME_INTERNET,
+      HOTSPOT_WIFI: ServiceType.HOTSPOT_WIFI,
+      MOBILE_RECHARGE: ServiceType.MOBILE_RECHARGE,
+      ELECTRICITY_BILL: ServiceType.ELECTRICITY_BILL,
+      SET_TOP_BOX: ServiceType.SET_TOP_BOX,
     };
     if (typeMap[excelPackage.serviceType.toUpperCase()]) {
       serviceType = typeMap[excelPackage.serviceType.toUpperCase()];
@@ -138,12 +140,12 @@ export class ServiceService {
           validity: excelPackage.validity || null,
           bandwidth: excelPackage.bandwidth || null,
           dataLimit: excelPackage.dataLimit || null,
-          status: 'ACTIVE',
+          status: PackageStatus.ACTIVE,
           excelPackageId: excelPackage.packageId,
         },
       });
 
-      logger.info('Package lazy-imported from Excel', {
+      this.logger.info('Package lazy-imported from Excel', {
         excelPackageId: excelPackage.packageId,
         dbId: imported.id,
         name: imported.name,
@@ -155,7 +157,7 @@ export class ServiceService {
         commission: parseFloat(imported.commission.toString()),
       };
     } catch (error) {
-      logger.error('Failed to lazy-import Excel package', {
+      this.logger.error('Failed to lazy-import Excel package', {
         excelPackageId: excelPackage.packageId,
         error: error instanceof Error ? error.message : error,
       });
@@ -179,7 +181,7 @@ export class ServiceService {
       },
     });
 
-    logger.info('Package created', { id: pkg.id, name: pkg.name });
+    this.logger.info('Package created', { id: pkg.id, name: pkg.name });
 
     return {
       ...pkg,
@@ -235,10 +237,10 @@ export class ServiceService {
       if (!pkg) {
         throw new NotFoundError('Package not found');
       }
-      if (pkg.status !== 'ACTIVE') {
+      if (pkg.status !== PackageStatus.ACTIVE) {
         throw new AppError('Package is not active', 400);
       }
-      if (pkg.serviceType !== 'HOME_INTERNET') {
+      if (pkg.serviceType !== ServiceType.HOME_INTERNET) {
         throw new AppError('Package is not a home internet package', 400);
       }
 
@@ -246,7 +248,7 @@ export class ServiceService {
       const existingActive = await this.serviceDb.homeService.findFirst({
         where: {
           connectionId: input.connectionId,
-          status: 'ACTIVE',
+          status: PackageStatus.ACTIVE,
         },
       });
 
@@ -285,11 +287,11 @@ export class ServiceService {
       // 4. Create execution log (PENDING)
       const executionLog = await this.serviceDb.serviceExecutionLog.create({
         data: {
-          serviceType: 'HOME_INTERNET',
+          serviceType: ServiceType.HOME_INTERNET,
           serviceRecordId: 'PENDING',
           packageId: pkg.id,
           userId: input.userId,
-          status: 'PENDING',
+          status: ExecutionStatus.PENDING,
           executionMethod: 'AUTOMATIC',
           requestPayload: input as any,
         },
@@ -325,9 +327,10 @@ export class ServiceService {
         await this.serviceDb.serviceExecutionLog.update({
           where: { id: executionLog.id },
           data: {
-            status: 'FAILED',
+            status: ExecutionStatus.FAILED,
             errorMessage: error instanceof Error ? error.message : 'Wallet debit failed',
             completedAt: new Date(),
+            walletTransactionId: walletTx?.transactionId,
           },
         });
         throw error;
@@ -337,7 +340,7 @@ export class ServiceService {
       await this.serviceDb.serviceExecutionLog.update({
         where: { id: executionLog.id },
         data: {
-          status: 'EXECUTING',
+          status: ExecutionStatus.EXECUTING,
           walletTransactionId: walletTx.transactionId,
           startedAt: new Date(),
         },
@@ -345,72 +348,32 @@ export class ServiceService {
 
       // 7. Execute activation
       try {
+
         const result = await executeHomeInternetActivation({
           connectionId: input.connectionId,
           packageName: pkg.name,
           subscriberName: input.subscriberName,
           bandwidth: pkg.bandwidth || undefined,
-          validity: pkg.validity || undefined,
+          validity: pkg.validity ? String(pkg.validity) : undefined,
+              amount: pkg.price,
+              execution: executionLog,
         });
 
-        if (!result.success) {
-          throw new Error(result.message || 'Activation failed');
-        }
+        // The executionLog status is already EXECUTING from step 6.
+        // We will not update it to COMPLETED here.
+        // We will not create the homeService record here.
+        // The actual service completion/failure will be handled by BullMQ listeners.
 
-        // 8. Create service record
-        // Force ownership assignment here
-        const homeService = await this.serviceDb.homeService.upsert({
-          where: { connectionId: input.connectionId },
-          update: {
-            userId: input.userId,
-            packageId: pkg.id,
-            subscriberName: input.subscriberName,
-            address: input.address,
-            area: input.area || null,
-            status: 'ACTIVE',
-            activatedAt: result.activatedAt || new Date(),
-            expiresAt: result.expiresAt || null,
-            walletTransactionId: walletTx.transactionId,
-          },
-          create: {
-            userId: input.userId,
-            packageId: pkg.id,
-            connectionId: input.connectionId,
-            subscriberName: input.subscriberName,
-            address: input.address,
-            area: input.area || null,
-            status: 'ACTIVE',
-            activatedAt: result.activatedAt || new Date(),
-            expiresAt: result.expiresAt || null,
-            walletTransactionId: walletTx.transactionId,
-          },
-        });
-
-        // 9. Update execution log to COMPLETED
-        await this.serviceDb.serviceExecutionLog.update({
-          where: { id: executionLog.id },
-          data: {
-            status: 'COMPLETED',
-            serviceRecordId: homeService.id,
-            completedAt: new Date(),
-            duration: Date.now() - (executionLog.createdAt?.getTime() || Date.now()),
-            responsePayload: result as any,
-          },
-        });
-
-        // 10. Notify
-        notifyServiceCompleted(input.userId, pkg.name);
-
-        logger.info('Home internet purchase completed', {
-          serviceId: homeService.id,
+        this.logger.info('Home internet renewal job queued', {
+          executionLogId: executionLog.id,
           connectionId: input.connectionId,
           transactionId: walletTx.transactionId,
         });
 
         return {
-          serviceRecordId: homeService.id,
+          serviceRecordId: executionLog.serviceRecordId,
           executionLogId: executionLog.id,
-          status: 'COMPLETED' as ExecutionStatus,
+          status: ExecutionStatus.EXECUTING,
           walletTransactionId: walletTx.transactionId,
           message: result.message,
         };
@@ -420,7 +383,7 @@ export class ServiceService {
           await this.serviceDb.serviceExecutionLog.update({
             where: { id: executionLog.id },
             data: {
-              status: 'PENDING',
+              status: ExecutionStatus.PENDING,
               executionMethod: 'MANUAL',
               startedAt: null,
               errorMessage: null,
@@ -430,7 +393,7 @@ export class ServiceService {
           return {
             serviceRecordId: executionLog.serviceRecordId,
             executionLogId: executionLog.id,
-            status: 'PENDING' as ExecutionStatus,
+            status: ExecutionStatus.PENDING,
             walletTransactionId: walletTx.transactionId,
             message: 'Home internet request submitted. Awaiting admin processing.',
           };
@@ -460,7 +423,7 @@ export class ServiceService {
     return withLock(lockKey, async () => {
       const pkg = await this.getPackageById(input.packageId);
       if (!pkg) throw new NotFoundError('Package not found');
-      if (pkg.status !== 'ACTIVE') throw new AppError('Package is not active', 400);
+      if (pkg.status !== PackageStatus.ACTIVE) throw new AppError('Package is not active', 400);
       if (pkg.serviceType !== 'HOTSPOT_WIFI') throw new AppError('Not a hotspot package', 400);
 
       const price = pkg.price;
@@ -477,11 +440,11 @@ export class ServiceService {
 
       const executionLog = await this.serviceDb.serviceExecutionLog.create({
         data: {
-          serviceType: 'HOTSPOT_WIFI',
+          serviceType: ServiceType.HOTSPOT_WIFI,
           serviceRecordId: 'PENDING',
           packageId: pkg.id,
           userId: input.userId,
-          status: 'PENDING',
+          status: ExecutionStatus.PENDING,
           executionMethod: 'AUTOMATIC',
           requestPayload: input as any,
         },
@@ -512,9 +475,10 @@ export class ServiceService {
         await this.serviceDb.serviceExecutionLog.update({
           where: { id: executionLog.id },
           data: {
-            status: 'FAILED',
+            status: ExecutionStatus.FAILED,
             errorMessage: error instanceof Error ? error.message : 'Wallet debit failed',
             completedAt: new Date(),
+            walletTransactionId: walletTx?.transactionId,
           },
         });
         throw error;
@@ -523,7 +487,7 @@ export class ServiceService {
       await this.serviceDb.serviceExecutionLog.update({
         where: { id: executionLog.id },
         data: {
-          status: 'EXECUTING',
+          status: ExecutionStatus.EXECUTING,
           walletTransactionId: walletTx.transactionId,
           startedAt: new Date(),
         },
@@ -550,7 +514,7 @@ export class ServiceService {
             deviceMac: input.deviceMac || null,
             voucherCode: result.voucherCode || null,
             zoneId: input.zoneId || null,
-            status: 'ACTIVE',
+            status: PackageStatus.ACTIVE,
             activatedAt: result.activatedAt || new Date(),
             expiresAt: result.expiresAt || null,
             walletTransactionId: walletTx.transactionId,
@@ -560,7 +524,7 @@ export class ServiceService {
         await this.serviceDb.serviceExecutionLog.update({
           where: { id: executionLog.id },
           data: {
-            status: 'COMPLETED',
+            status: ExecutionStatus.COMPLETED,
             serviceRecordId: hotspotService.id,
             completedAt: new Date(),
             duration: Date.now() - (executionLog.createdAt?.getTime() || Date.now()),
@@ -570,7 +534,7 @@ export class ServiceService {
 
         notifyServiceCompleted(input.userId, pkg.name);
 
-        logger.info('Hotspot purchase completed', {
+        this.logger.info('Hotspot purchase completed', {
           serviceId: hotspotService.id,
           voucherCode: result.voucherCode,
           transactionId: walletTx.transactionId,
@@ -589,7 +553,7 @@ export class ServiceService {
           await this.serviceDb.serviceExecutionLog.update({
             where: { id: executionLog.id },
             data: {
-              status: 'PENDING',
+              status: ExecutionStatus.PENDING,
               executionMethod: 'MANUAL',
               startedAt: null,
               errorMessage: null,
@@ -639,10 +603,10 @@ export class ServiceService {
 
       const executionLog = await this.serviceDb.serviceExecutionLog.create({
         data: {
-          serviceType: 'MOBILE_RECHARGE',
+          serviceType: ServiceType.MOBILE_RECHARGE,
           serviceRecordId: 'PENDING',
           userId: input.userId,
-          status: 'PENDING',
+          status: ExecutionStatus.PENDING,
           executionMethod: 'AUTOMATIC',
           requestPayload: {
             mobileNumber: input.mobileNumber,
@@ -682,7 +646,7 @@ export class ServiceService {
         await this.serviceDb.serviceExecutionLog.update({
           where: { id: executionLog.id },
           data: {
-            status: 'FAILED',
+            status: ExecutionStatus.FAILED,
             errorMessage: error instanceof Error ? error.message : 'Wallet debit failed',
             completedAt: new Date(),
           },
@@ -693,7 +657,7 @@ export class ServiceService {
       await this.serviceDb.serviceExecutionLog.update({
         where: { id: executionLog.id },
         data: {
-          status: 'EXECUTING',
+          status: ExecutionStatus.EXECUTING,
           walletTransactionId: walletTx.transactionId,
           startedAt: new Date(),
         },
@@ -727,7 +691,7 @@ export class ServiceService {
         await this.serviceDb.serviceExecutionLog.update({
           where: { id: executionLog.id },
           data: {
-            status: 'COMPLETED',
+            status: ExecutionStatus.COMPLETED,
             serviceRecordId: rechargeRecord.id,
             completedAt: new Date(),
             duration: Date.now() - (executionLog.createdAt?.getTime() || Date.now()),
@@ -737,7 +701,7 @@ export class ServiceService {
 
         notifyServiceCompleted(input.userId, `Mobile Recharge ৳${input.amount}`);
 
-        logger.info('Mobile recharge completed', {
+        this.logger.info('Mobile recharge completed', {
           serviceId: rechargeRecord.id,
           transactionId: walletTx.transactionId,
         });
@@ -768,7 +732,7 @@ export class ServiceService {
           await this.serviceDb.serviceExecutionLog.update({
             where: { id: executionLog.id },
             data: {
-              status: 'PENDING',
+              status: ExecutionStatus.PENDING,
               executionMethod: 'MANUAL',
               serviceRecordId: rechargeRecord.id,
               startedAt: null,
@@ -797,7 +761,7 @@ export class ServiceService {
             walletTransactionId: walletTx.transactionId,
             failureReason: errMsg,
           },
-        }).catch((e: any) => logger.error('Failed to create recharge failure record', { error: e }));
+        }).catch((e: any) => this.logger.error('Failed to create recharge failure record', { error: e }));
 
         return this.handleExecutionFailure(
           executionLog.id,
@@ -833,10 +797,10 @@ export class ServiceService {
 
       const executionLog = await this.serviceDb.serviceExecutionLog.create({
         data: {
-          serviceType: 'ELECTRICITY_BILL',
+          serviceType: ServiceType.ELECTRICITY_BILL,
           serviceRecordId: 'PENDING',
           userId: input.userId,
-          status: 'PENDING',
+          status: ExecutionStatus.PENDING,
           executionMethod: 'AUTOMATIC',
           requestPayload: {
             meterNumber: input.meterNumber,
@@ -876,7 +840,7 @@ export class ServiceService {
         await this.serviceDb.serviceExecutionLog.update({
           where: { id: executionLog.id },
           data: {
-            status: 'FAILED',
+            status: ExecutionStatus.FAILED,
             errorMessage: error instanceof Error ? error.message : 'Wallet debit failed',
             completedAt: new Date(),
           },
@@ -887,7 +851,7 @@ export class ServiceService {
       await this.serviceDb.serviceExecutionLog.update({
         where: { id: executionLog.id },
         data: {
-          status: 'EXECUTING',
+          status: ExecutionStatus.EXECUTING,
           walletTransactionId: walletTx.transactionId,
           startedAt: new Date(),
         },
@@ -923,7 +887,7 @@ export class ServiceService {
         await this.serviceDb.serviceExecutionLog.update({
           where: { id: executionLog.id },
           data: {
-            status: 'COMPLETED',
+            status: ExecutionStatus.COMPLETED,
             serviceRecordId: billRecord.id,
             completedAt: new Date(),
             duration: Date.now() - (executionLog.createdAt?.getTime() || Date.now()),
@@ -933,7 +897,7 @@ export class ServiceService {
 
         notifyServiceCompleted(input.userId, `Electricity Bill ৳${input.amount}`);
 
-        logger.info('Electricity bill payment completed', {
+        this.logger.info('Electricity bill payment completed', {
           serviceId: billRecord.id,
           transactionId: walletTx.transactionId,
         });
@@ -965,7 +929,7 @@ export class ServiceService {
           await this.serviceDb.serviceExecutionLog.update({
             where: { id: executionLog.id },
             data: {
-              status: 'PENDING',
+              status: ExecutionStatus.PENDING,
               executionMethod: 'MANUAL',
               serviceRecordId: billRecord.id,
               startedAt: null,
@@ -994,7 +958,7 @@ export class ServiceService {
             walletTransactionId: walletTx.transactionId,
             failureReason: errMsg,
           },
-        }).catch((e: any) => logger.error('Failed to create bill failure record', { error: e }));
+        }).catch((e: any) => this.logger.error('Failed to create bill failure record', { error: e }));
 
         return this.handleExecutionFailure(
           executionLog.id,
@@ -1011,20 +975,21 @@ export class ServiceService {
   // EXECUTION FAILURE + AUTO REFUND
   // ═══════════════════════════════════════════════════════════════
 
-  private async handleExecutionFailure(
+  public async handleExecutionFailure(
     executionLogId: string,
     walletTransactionId: string,
     userId: string,
     serviceName: string,
     error: unknown
   ): Promise<ServiceExecutionResult> {
+    this.logger.debug('handleExecutionFailure called', { executionLogId, walletTransactionId, userId, serviceName, error });
     let errorMessage = error instanceof Error ? error.message : 'Unknown execution error';
 
     if (error instanceof AppError && error.details?.expiresAt) {
       errorMessage += ` (Available after: ${new Date(error.details.expiresAt).toLocaleString()})`;
     }
 
-    logger.error('Service execution failed, initiating auto-refund', {
+    this.logger.error('Service execution failed, initiating auto-refund', {
       executionLogId,
       walletTransactionId,
       userId,
@@ -1042,6 +1007,7 @@ export class ServiceService {
     });
 
     const autoRefundEnabled = autoRefundSetting?.value === 'true';
+    this.logger.debug('Auto-refund check before refundTransaction', { executionLogId, walletTransactionId, autoRefundEnabled });
 
     let refundTransactionId: string | undefined;
 
@@ -1062,13 +1028,13 @@ export class ServiceService {
 
         notifyRefundProcessed(userId, refundResult.amount, walletBalance.balance);
 
-        logger.info('Auto-refund processed', {
+        this.logger.info('Auto-refund processed', {
           executionLogId,
           refundTransactionId,
           amount: refundResult.amount,
         });
       } catch (refundError) {
-        logger.error('AUTO-REFUND FAILED - CRITICAL', {
+        this.logger.error('AUTO-REFUND FAILED - CRITICAL', {
           executionLogId,
           walletTransactionId,
           userId,
@@ -1077,7 +1043,7 @@ export class ServiceService {
         // This is a critical failure - must be manually resolved
       }
     } else {
-      logger.warn('Auto-refund disabled, manual refund required', {
+      this.logger.warn('Auto-refund disabled, manual refund required', {
         executionLogId,
         walletTransactionId,
       });
@@ -1282,7 +1248,7 @@ export class ServiceService {
       userAgent,
     });
 
-    logger.info('Service manually executed by admin', {
+    this.logger.info('Service manually executed by admin', {
       executionLogId,
       adminId,
       serviceType: execLog.serviceType,
@@ -1555,7 +1521,7 @@ export class ServiceService {
       userAgent,
     });
 
-    logger.info('Home internet connection ownership released by admin', {
+    this.logger.info('Home internet connection ownership released by admin', {
       adminId,
       connectionId,
       previousUserId: existing.userId,
@@ -1670,7 +1636,7 @@ export class ServiceService {
       userAgent,
     });
 
-    logger.info('Admin manual refund processed', {
+    this.logger.info('Admin manual refund processed', {
       executionLogId,
       adminId,
       refundTransactionId: refundResult.transactionId,

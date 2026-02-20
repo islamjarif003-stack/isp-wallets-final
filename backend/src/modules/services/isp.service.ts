@@ -1,4 +1,4 @@
-import { serviceDb } from '../../config/database';
+import { getServiceDb } from '../../config/database';
 import { ispRenewalQueue } from '../../queues/ispRenewal.queue';
 import { AppError } from '../../utils/errors';
 
@@ -18,7 +18,7 @@ export class IspService {
       };
     }
 
-    const logs = await serviceDb.serviceExecutionLog.findMany({
+    const logs = await getServiceDb().serviceExecutionLog.findMany({
       where,
       skip: (page - 1) * limit,
       take: limit,
@@ -27,13 +27,13 @@ export class IspService {
       },
     });
 
-    const total = await serviceDb.serviceExecutionLog.count({ where });
+    const total = await getServiceDb().serviceExecutionLog.count({ where });
 
     return { logs, total, page, limit };
   }
 
   async retryJob(logId: string) {
-    const log = await serviceDb.serviceExecutionLog.findUnique({
+    const log = await getServiceDb().serviceExecutionLog.findUnique({
       where: { id: logId },
     });
 
@@ -58,7 +58,7 @@ export class IspService {
     );
 
     // Update the log status to QUEUED
-    await serviceDb.serviceExecutionLog.update({
+    await getServiceDb().serviceExecutionLog.update({
       where: { id: logId },
       data: { status: 'QUEUED' },
     });

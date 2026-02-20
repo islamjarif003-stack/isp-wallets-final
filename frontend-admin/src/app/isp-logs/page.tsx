@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { api } from '@/utils/api';
+import { api } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { FaSync, FaSearch, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
@@ -50,7 +50,7 @@ const IspLogsPage = () => {
         limit: '15',
         ...currentFilters,
       });
-      const response = await api.get(`/admin/isp/logs?${params.toString()}`);
+      const response = await api(`/admin/isp/logs?${params.toString()}`, { method: 'GET' });
       setLogs(response.data.logs);
       setTotalPages(Math.ceil(response.data.total / 15));
       setPage(pageNum);
@@ -76,7 +76,7 @@ const IspLogsPage = () => {
 
   const handleRetry = async (logId: string) => {
     try {
-      await api.post(`/admin/isp/logs/${logId}/retry`);
+      await api(`/admin/isp/logs/${logId}/retry`, { method: 'POST' });
       toast.success('Job has been re-queued.');
       fetchLogs(page, filters);
     } catch (error) {

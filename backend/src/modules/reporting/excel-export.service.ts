@@ -1,7 +1,8 @@
 import ExcelJS from 'exceljs';
 import { getAccountWalletDb } from '../../config/database';
 import { getServiceDb } from '../../config/database';
-import { logger } from '../../utils/logger';
+import { getLogger } from '../../utils/logger';
+const logger = getLogger();
 
 export class ExcelExportService {
   private walletDb = getAccountWalletDb();

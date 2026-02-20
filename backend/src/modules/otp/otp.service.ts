@@ -1,9 +1,9 @@
 import bcrypt from 'bcrypt';
 import { getAccountWalletDb } from '../../config/database';
-import { getRedis, isRedisAvailable } from '../../config/redis';
+import { redisConnection } from '../../config/redis';
 import { env } from '../../config/env';
 import { APP_CONSTANTS } from '../../config/constants';
-import { logger } from '../../utils/logger';
+import { getLogger } from '../../utils/logger';
 import { generateOtp } from '../../utils/helpers';
 import { checkRedisRateLimit } from '../../middleware/rateLimiter.middleware';
 import { SendOtpInput, VerifyOtpInput, OtpResult } from './otp.types';
@@ -12,6 +12,7 @@ import { OtpType } from '@prisma/account-wallet-client';
 
 export class OtpService {
   private db = getAccountWalletDb();
+  private logger = getLogger();
 
   async sendOtp(input: SendOtpInput): Promise<OtpResult> {
     const { mobile, type, userId, ipAddress, userAgent } = input;
@@ -29,8 +30,8 @@ export class OtpService {
       );
     }
 
-    if (isRedisAvailable()) {
-      const redis = getRedis();
+    if (env.REDIS_ENABLED) {
+      const redis = redisConnection;
       const cooldownKey = APP_CONSTANTS.REDIS_KEYS.OTP_COOLDOWN(mobile);
       const cooldownExists = await redis.exists(cooldownKey);
       if (cooldownExists) {
@@ -68,8 +69,8 @@ export class OtpService {
       },
     });
 
-    if (isRedisAvailable()) {
-      const redis = getRedis();
+    if (env.REDIS_ENABLED) {
+      const redis = redisConnection;
       const cooldownKey = APP_CONSTANTS.REDIS_KEYS.OTP_COOLDOWN(mobile);
       await redis.setex(
         cooldownKey,
@@ -80,7 +81,7 @@ export class OtpService {
 
     await this.sendSms(mobile, type, otpPlain);
 
-    logger.info('OTP sent successfully', {
+    this.logger.info('OTP sent successfully', {
       mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
       type,
       otpRequestId: otpRequest.id,
@@ -150,7 +151,7 @@ export class OtpService {
       data: { status: 'VERIFIED', verifiedAt: new Date() },
     });
 
-    logger.info('OTP verified successfully', {
+    this.logger.info('OTP verified successfully', {
       mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
       type,
       otpRequestId: otpRequest.id,
@@ -192,7 +193,7 @@ export class OtpService {
     const expiryMinutes = String(env.OTP_EXPIRY_MINUTES);
 
     if (!enabled) {
-      logger.info('SMS sending disabled by settings. OTP not sent.', {
+      this.logger.info('SMS sending disabled by settings. OTP not sent.', {
         mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
         type,
       });
@@ -206,7 +207,7 @@ export class OtpService {
 
     const template = settings[templateKey] || '';
     if (!template) {
-      logger.warn('SMS template missing. OTP not sent.', {
+      this.logger.warn('SMS template missing. OTP not sent.', {
         mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
         type,
         templateKey,
@@ -219,7 +220,7 @@ export class OtpService {
       .replace(/\{\{\s*expiryMinutes\s*\}\}/g, expiryMinutes);
 
     if (!smsUrl || !smsApiKey || !senderId) {
-      logger.warn('SMS gateway settings missing. OTP not sent.', {
+      this.logger.warn('SMS gateway settings missing. OTP not sent.', {
         mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
         type,
       });
@@ -260,18 +261,18 @@ export class OtpService {
 
       if (!response.ok) {
         const contentType = response.headers.get('content-type') || '';
-        logger.error('SMS gateway returned error', {
+        this.logger.error('SMS gateway returned error', {
           status: response.status,
           contentType,
           mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
         });
       } else {
-        logger.info('SMS sent successfully', {
+        this.logger.info('SMS sent successfully', {
           mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
         });
       }
     } catch (error) {
-      logger.error('SMS sending failed', {
+      this.logger.error('SMS sending failed', {
         mobile: mobile.slice(0, 3) + '****' + mobile.slice(-4),
         error: error instanceof Error ? error.message : error,
       });
@@ -296,9 +297,9 @@ export class OtpService {
   private async getSystemSettings(): Promise<Record<string, string>> {
     const key = APP_CONSTANTS.REDIS_KEYS.SYSTEM_SETTINGS;
 
-    if (isRedisAvailable()) {
+    if (env.REDIS_ENABLED) {
       try {
-        const redis = getRedis();
+        const redis = redisConnection;
         const cached = await redis.get(key);
         if (cached) {
           const parsed = JSON.parse(cached) as Record<string, string>;
@@ -315,9 +316,9 @@ export class OtpService {
       settings[r.key] = r.value;
     }
 
-    if (isRedisAvailable()) {
+    if (env.REDIS_ENABLED) {
       try {
-        const redis = getRedis();
+        const redis = redisConnection;
         await redis.setex(key, 300, JSON.stringify(settings));
       } catch {}
     }

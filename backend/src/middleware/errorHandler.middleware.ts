@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError, ValidationError } from '../utils/errors';
-import { logger } from '../utils/logger';
+import { getLogger } from '../utils/logger';
 import { env } from '../config/env';
 import { ZodError } from 'zod';
+
+const logger = getLogger();
 
 export function errorHandler(
   err: Error,

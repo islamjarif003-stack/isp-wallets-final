@@ -2,12 +2,12 @@ import { getServiceDb, getAccountWalletDb } from '../../../config/database';
 import { WalletService } from '../../wallet/wallet.service';
 import { withLock } from '../../../utils/distributed-lock';
 import { generateIdempotencyKey } from '../../../utils/idempotency';
-import { logger } from '../../../utils/logger';
+import { getLogger } from '../../../utils/logger';
 import { AppError, NotFoundError, InsufficientBalanceError, ForbiddenError, ConflictError } from '../../../utils/errors';
 import { CreateHotspotCardInput, PurchaseHotspotInput, HotspotCardStats } from './hotspot.types';
 import { createAuditLog } from '../../../utils/audit';
 import { notifyServicePurchased, notifyServiceCompleted, notifyServiceFailed } from '../../notification/notification.queue';
-import { ServiceType } from '@prisma/service-client';
+import { ServiceType, PackageStatus, ExecutionStatus } from '@prisma/service-client';
 
 import { getNotificationService } from '../../notification/notification.service';
 import bcrypt from 'bcrypt';
@@ -17,6 +17,7 @@ export class HotspotService {
   private walletDb = getAccountWalletDb();
   private walletService = new WalletService();
   private notificationService = getNotificationService();
+  private logger = getLogger();
 
   // ═══════════════════════════════════════════════════════════════
   // HELPER: Verify Admin Password
@@ -76,7 +77,7 @@ export class HotspotService {
       }))
     });
 
-    logger.info('Hotspot cards added', { 
+    this.logger.info('Hotspot cards added', { 
       packageId: input.packageId, 
       count: newCodes.length, 
       adminId 
@@ -135,7 +136,7 @@ export class HotspotService {
       }
     });
 
-    logger.info('Hotspot card reset to AVAILABLE', { cardId, adminId });
+    this.logger.info('Hotspot card reset to AVAILABLE', { cardId, adminId });
   }
 
   async getUsedCards(packageId?: string): Promise<any[]> {
@@ -188,7 +189,7 @@ export class HotspotService {
         data: { code: newCode }
     });
 
-    logger.info('Card code updated', { cardId, newCode, adminId });
+    this.logger.info('Card code updated', { cardId, newCode, adminId });
   }
 
   async deleteCard(cardId: string, adminId: string, password?: string): Promise<void> {
@@ -198,7 +199,7 @@ export class HotspotService {
     if (!card) throw new NotFoundError('Card not found');
 
     await this.serviceDb.hotspotCard.delete({ where: { id: cardId } });
-    logger.info('Card deleted', { cardId, code: card.code, adminId });
+    this.logger.info('Card deleted', { cardId, code: card.code, adminId });
   }
 
   async deleteAllAvailableCards(packageId: string | undefined, adminId: string, password?: string): Promise<void> {
@@ -208,7 +209,7 @@ export class HotspotService {
     if (packageId) where.packageId = packageId;
 
     const result = await this.serviceDb.hotspotCard.deleteMany({ where });
-    logger.info('All available cards deleted', { count: result.count, packageId, adminId });
+    this.logger.info('All available cards deleted', { count: result.count, packageId, adminId });
   }
 
   async getPackageStock(packageId: string) {
@@ -358,9 +359,9 @@ export class HotspotService {
         try {
             const smsMessage = `Your Hotspot PIN is ${allocatedCard.code}. Package: ${pkg.name}. Valid for ${pkg.validity} Days. Enjoy!`;
             await this.notificationService.queueSms(input.mobileNumber, smsMessage);
-            logger.info(`SMS queued for ${input.mobileNumber}: ${smsMessage}`);
+            this.logger.info(`SMS queued for ${input.mobileNumber}: ${smsMessage}`);
         } catch (smsError: any) {
-            logger.error('SMS sending failed', { error: smsError.message });
+            this.logger.error('SMS sending failed', { error: smsError.message });
             // Throw error to trigger refund flow
             throw new Error('Failed to send SMS voucher');
         }
@@ -379,7 +380,7 @@ export class HotspotService {
         };
 
       } catch (error: any) {
-        logger.error('Hotspot purchase failed', { error: error.message, userId: input.userId });
+        this.logger.error('Hotspot purchase failed', { error: error.message, userId: input.userId });
 
         // If card was allocated but transaction failed later (e.g. SMS), release the card
         if (error.message.includes('SMS') && allocatedCard) {
@@ -388,9 +389,9 @@ export class HotspotService {
                     where: { id: allocatedCard.id },
                     data: { status: 'AVAILABLE', usedBy: null }
                 });
-                logger.info('Auto-released card due to SMS failure', { cardId: allocatedCard.id });
+                this.logger.info('Auto-released card due to SMS failure', { cardId: allocatedCard.id });
             } catch (releaseError: any) {
-                logger.error('Failed to auto-release card', { cardId: allocatedCard.id, error: releaseError.message });
+                this.logger.error('Failed to auto-release card', { cardId: allocatedCard.id, error: releaseError.message });
             }
         }
 
