@@ -11,15 +11,15 @@ interface IspRenewalJobData {
   executionLogId: string;
   clientId: string;
   amount: number;
+  packageName: string;
 }
 
 // ... (imports)
 
 const processIspRenewal = async (job: Job<IspRenewalJobData>) => {
-  const { executionLogId, clientId, amount } = job.data;
+  const { executionLogId, clientId, amount, packageName } = job.data;
   console.log(`Processing ISP renewal for client: ${clientId}, amount: ${amount}`);
 
-  // Update status to PROCESSING
   await serviceDb.serviceExecutionLog.update({
     where: { id: executionLogId },
     data: { status: 'PROCESSING', startedAt: new Date() },
@@ -33,18 +33,20 @@ const processIspRenewal = async (job: Job<IspRenewalJobData>) => {
     // 1. Login to ISP Portal
     await loginToIspPortal(page);
 
-    // 2. Find and renew client
-    const renewalSuccess = await findAndRenewClient(page, clientId, amount);
+    // 2. Find subscriptionId (if not already mapped)
+    let subscriptionId = await getSubscriptionId(page, clientId);
+
+    // 3. Renew the client
+    const renewalSuccess = await renewClient(page, subscriptionId, packageName);
 
     if (renewalSuccess) {
       console.log(`Successfully renewed for client: ${clientId}`);
-      // Update execution log with COMPLETED status
       await serviceDb.serviceExecutionLog.update({
         where: { id: executionLogId },
         data: {
           status: 'COMPLETED',
           completedAt: new Date(),
-          details: { message: 'Renewal successful' },
+          details: { message: 'Renewal successful', subscriptionId },
         },
       });
       return { status: 'Completed', executionLogId };
@@ -93,11 +95,11 @@ async function loginToIspPortal(page: Page) {
   await page.goto(loginUrl);
 
   // --- USER ACTION NEEDED ---
-  // Please provide the correct selectors for the username, password, and submit button.
-  const usernameSelector = '#username'; // <-- Replace with actual username input selector
-  const passwordSelector = '#password'; // <-- Replace with actual password input selector
-  const submitButtonSelector = 'button[type="submit"]'; // <-- Replace with actual submit button selector
-  const successUrlOrSelector = '/dashboard'; // <-- Replace with a URL path or a unique selector that appears only after a successful login
+  // Please verify these selectors for your SmartISP login page.
+  const usernameSelector = 'input[name="username"]'; // <-- VERIFY THIS
+  const passwordSelector = 'input[name="password"]'; // <-- VERIFY THIS
+  const submitButtonSelector = 'button[type="submit"]'; // <-- VERIFY THIS
+  const successUrlOrSelector = '/index.php'; // <-- VERIFY THIS: The page you land on after login
 
   console.log('Filling login credentials...');
   await page.fill(usernameSelector, process.env.ISP_PORTAL_USER || '');
@@ -107,62 +109,127 @@ async function loginToIspPortal(page: Page) {
   await page.click(submitButtonSelector);
 
   console.log(`Waiting for login success indicator: ${successUrlOrSelector}`);
-  // Wait for either a URL change or a specific element to appear
-  await page.waitForURL((url) => url.pathname.includes(successUrlOrSelector));
+  // Wait for the URL to change to the dashboard page
+  await page.waitForURL(`**${successUrlOrSelector}`, { timeout: 15000 });
   
   console.log('Login successful.');
 }
 
-async function findAndRenewClient(page: Page, clientId: string, amount: number): Promise<boolean> {
-  // --- USER ACTION NEEDED ---
-  // Please provide the correct selectors and workflow for finding and renewing a client.
-  const clientSearchUrl = process.env.ISP_CLIENT_SEARCH_URL; // e.g., http://isppanel.com/clients/search
+async function getSubscriptionId(page: Page, clientId: string): Promise<string> {
+  // 1. Check our database first
+  const existingMap = await serviceDb.ispClientMap.findUnique({
+    where: { clientId },
+  });
+
+  if (existingMap) {
+    console.log(`Found mapped subscriptionId: ${existingMap.subscriptionId} for clientId: ${clientId}`);
+    return existingMap.subscriptionId;
+  }
+
+  // 2. If not found, scrape it from the ISP panel
+  console.log(`No mapping found for clientId: ${clientId}. Scraping from ISP panel...`);
+  await serviceDb.serviceExecutionLog.updateMany({
+    where: { requestPayload: { path: ['clientId'], equals: clientId } },
+    data: { status: 'MAPPING_CLIENT' },
+  });
+
+  const clientSearchUrl = process.env.ISP_CLIENT_SEARCH_URL;
   if (!clientSearchUrl) throw new Error('ISP_CLIENT_SEARCH_URL is not defined in .env');
 
   console.log(`Navigating to client search page at ${clientSearchUrl}`);
   await page.goto(clientSearchUrl);
 
-  const searchInputSelector = '#search-client-input'; // <-- Replace with actual search input selector
-  const searchButtonSelector = '#search-client-button'; // <-- Replace with actual search button selector
-  // This selector should target a unique element for the client row that contains the client ID.
-  // Example: `tr[data-client-id="${clientId}"]`
-  const clientRowSelector = `.client-row[data-id="${clientId}"]`; // <-- Replace with a selector that uniquely identifies the client's row or entry
+  // --- USER ACTION NEEDED ---
+  // These selectors are for finding the client and extracting the subscriptionId.
+  const searchInputSelector = 'input[type="search"]'; // Already provided
+  const searchButtonSelector = 'button[type="submit"]'; // This might not be needed if search is automatic
   
+  // This selector points to the link in the "C.ID" column of the first row of the results table.
+  const clientLinkSelector = '#client-table-body > tr:first-child > td:nth-child(3) > a'; // <-- VERIFY THIS
+
   console.log(`Searching for client ID: ${clientId}`);
   await page.fill(searchInputSelector, clientId);
-  await page.click(searchButtonSelector);
+  // Some search boxes automatically trigger search. We will wait for the result directly.
+  // If your panel requires a button click, uncomment the next line.
+  // await page.click(searchButtonSelector);
 
-  console.log(`Waiting for client row to appear with selector: ${clientRowSelector}`);
-  await page.waitForSelector(clientRowSelector, { timeout: 10000 }); // Wait 10 seconds for search results
+  console.log(`Waiting for client link to appear with selector: ${clientLinkSelector}`);
+  await page.waitForSelector(clientLinkSelector, { timeout: 15000 });
 
-  // This selector should target the 'Renew' button specifically for that client.
-  const renewButtonSelector = `${clientRowSelector} .renew-button`; // <-- Replace with the selector for the renew button within the client's row
-  
-  console.log('Clicking renew button...');
+  const clientLink = await page.getAttribute(clientLinkSelector, 'href');
+  if (!clientLink) {
+    throw new Error(`Could not find href attribute for selector: ${clientLinkSelector}`);
+  }
+
+  // Extract subscriptionId from the URL (e.g., from 'client-renew.php?subscriptionId=375510')
+  const urlParams = new URLSearchParams(clientLink);
+  const subscriptionId = urlParams.get('subscriptionId');
+
+  if (!subscriptionId) {
+    throw new Error(`Could not extract subscriptionId from link: ${clientLink}`);
+  }
+
+  console.log(`Extracted subscriptionId: ${subscriptionId}`);
+
+  // 3. Save the new mapping to our database
+  await serviceDb.ispClientMap.create({
+    data: {
+      clientId,
+      subscriptionId,
+    },
+  });
+  console.log(`Saved new mapping for clientId: ${clientId}`);
+
+  return subscriptionId;
+}
+
+async function renewClient(page: Page, subscriptionId: string, packageName: string): Promise<boolean> {
+  // This workflow directly navigates to the client renewal page.
+
+  const clientRenewUrl = `${process.env.ISP_PORTAL_URL.replace('/login.php', '')}/client-renew.php?subscriptionId=${subscriptionId}`;
+  console.log(`Navigating directly to client renewal page: ${clientRenewUrl}`);
+  await page.goto(clientRenewUrl);
+
+  await serviceDb.serviceExecutionLog.updateMany({
+    where: { requestPayload: { path: ['subscriptionId'], equals: subscriptionId } },
+    data: { status: 'RENEWING' },
+  });
+
+  // --- USER ACTION NEEDED ---
+  // Please verify and correct these selectors based on your ISP panel.
+  const planDropdownSelector = 'select[name="planId"]'; // <-- VERIFY THIS
+  const sendSmsCheckboxSelector = 'input[name="send_sms"]'; // <-- VERIFY THIS
+  const renewButtonSelector = 'button[name="renew"]'; // <-- VERIFY THIS
+  const successMessageText = 'client renewed successfully'; // <-- VERIFY THIS
+
+  console.log(`Waiting for plan dropdown: ${planDropdownSelector}`);
+  await page.waitForSelector(planDropdownSelector);
+
+  console.log(`Selecting package: ${packageName}`);
+  await page.selectOption(planDropdownSelector, { label: packageName });
+
+  if (await page.isChecked(sendSmsCheckboxSelector)) {
+    console.log('Unchecking "Send SMS" box...');
+    await page.uncheck(sendSmsCheckboxSelector);
+  }
+
+  console.log(`Clicking the renew button: ${renewButtonSelector}`);
   await page.click(renewButtonSelector);
 
-  // --- On the renewal page/modal ---
-  const renewalAmountInputSelector = '#renewal-amount'; // <-- Replace with renewal amount input selector
-  const confirmRenewalButtonSelector = '#confirm-renewal-button'; // <-- Replace with confirm button selector
-  const successIndicatorSelector = '.renewal-success-message'; // <-- Replace with a selector for the success message element
-  const successMessageText = 'successfully renewed'; // <-- Replace with the text that confirms success
+  await serviceDb.serviceExecutionLog.updateMany({
+    where: { requestPayload: { path: ['subscriptionId'], equals: subscriptionId } },
+    data: { status: 'VERIFYING' },
+  });
 
-  console.log('Waiting for renewal form to appear...');
-  await page.waitForSelector(renewalAmountInputSelector);
-
-  console.log(`Entering renewal amount: ${amount}`);
-  await page.fill(renewalAmountInputSelector, amount.toString());
+  console.log(`Waiting for success message containing: "${successMessageText}"`);
+  await page.waitForFunction(
+    (text) => document.body.innerText.toLowerCase().includes(text),
+    successMessageText.toLowerCase(),
+    { timeout: 15000 }
+  );
   
-  console.log('Confirming renewal...');
-  await page.click(confirmRenewalButtonSelector);
-
-  console.log(`Waiting for success message with selector: ${successIndicatorSelector}`);
-  await page.waitForSelector(successIndicatorSelector, { timeout: 15000 }); // Wait 15 seconds for confirmation
-
-  const successMessage = await page.textContent(successIndicatorSelector);
-  console.log(`Found confirmation message: "${successMessage}"`);
-  
-  return successMessage?.toLowerCase().includes(successMessageText.toLowerCase()) || false;
+  console.log('Success message found. Renewal confirmed.');
+  return true;
 }
 
 // ... (worker definition)

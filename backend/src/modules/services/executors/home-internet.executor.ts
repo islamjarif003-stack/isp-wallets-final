@@ -42,6 +42,7 @@ export async function executeHomeInternetActivation(
       executionLogId: log.id,
       clientId: input.connectionId,
       amount: input.amount,
+      packageName: input.packageName,
     }
   );
 
