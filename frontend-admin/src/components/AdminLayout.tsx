@@ -13,6 +13,7 @@ const navItems = [
   { href: '/wallets', label: 'Wallets', icon: '💰' },
   { href: '/services', label: 'Services', icon: '⚡' },
   { href: '/audit-logs', label: 'Audit Logs', icon: '📋' },
+  { href: '/isp-logs', label: 'ISP Logs', icon: '📡' },
   { href: '/reports', label: 'Reports', icon: '📈' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ];

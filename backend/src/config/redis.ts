@@ -1,57 +1,18 @@
-import Redis from 'ioredis';
-import { env } from './env';
-import { logger } from '../utils/logger';
+import { Redis } from 'ioredis';
 
-export const redisConfig = {
-  url: env.REDIS_URL,
-  host: env.REDIS_HOST,
-  port: env.REDIS_PORT,
-  password: env.REDIS_PASSWORD,
-  db: env.REDIS_DB,
+const redisConfig = {
+  host: process.env.REDIS_HOST || '127.0.0.1',
+  port: process.env.REDIS_PORT ? parseInt(process.env.REDIS_PORT, 10) : 6379,
+  password: process.env.REDIS_PASSWORD || undefined,
+  maxRetriesPerRequest: null, // Required for BullMQ
 };
 
-let redisClient: Redis | null = null;
+export const redisConnection = new Redis(redisConfig);
 
-function buildRedisUrl(): string {
-  if (redisConfig.url) return redisConfig.url;
-  const auth = redisConfig.password ? `:${encodeURIComponent(redisConfig.password)}@` : '';
-  return `redis://${auth}${redisConfig.host}:${redisConfig.port}/${redisConfig.db}`;
-}
+redisConnection.on('connect', () => {
+  console.log('Connected to Redis');
+});
 
-export function getRedis(): Redis {
-  if (redisClient) return redisClient;
-  if (!env.REDIS_ENABLED) {
-    throw new Error('Redis is disabled by configuration');
-  }
-  const url = buildRedisUrl();
-  redisClient = new Redis(url, {
-    maxRetriesPerRequest: 1,
-    enableReadyCheck: true,
-    lazyConnect: false,
-  });
-  redisClient.on('error', (error) => {
-    logger.error('Redis error', { error: error instanceof Error ? error.message : error });
-  });
-  return redisClient;
-}
-
-export function isRedisAvailable(): boolean {
-  if (!env.REDIS_ENABLED) return false;
-  try {
-    const client = getRedis();
-    return client.status === 'ready';
-  } catch {
-    return false;
-  }
-}
-
-export async function closeRedis(): Promise<void> {
-  if (!redisClient) return;
-  const client = redisClient;
-  redisClient = null;
-  try {
-    await client.quit();
-  } catch {
-    client.disconnect();
-  }
-}
+redisConnection.on('error', (err) => {
+  console.error('Redis connection error:', err);
+});

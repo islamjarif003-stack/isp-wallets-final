@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "scripts": {
     "postinstall": "npm run prisma:generate",
-    "dev": "nodemon",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "worker": "ts-node-dev --respawn --transpile-only src/workers/ispRenewal.worker.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "prisma:generate:wallet": "prisma generate --schema=prisma/account-wallet/schema.prisma",
@@ -25,6 +26,7 @@
     "@prisma/client": "^5.10.0",
     "axios": "^1.13.5",
     "bcrypt": "^5.1.1",
+    "bullmq": "^5.69.3",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^17.2.4",
@@ -34,10 +36,12 @@
     "helmet": "^7.1.0",
     "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
+    "playwright": "^1.58.2",
     "uuid": "^9.0.0",
     "winston": "^3.11.0",
     "xlsx": "^0.18.5",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "ts-node-dev": "^2.0.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

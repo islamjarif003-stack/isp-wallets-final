@@ -1,35 +1,55 @@
 import { logger } from '../../../utils/logger';
 import { AppError } from '../../../utils/errors';
+import { ispRenewalQueue } from '../../../queues/ispRenewal.queue';
+import { serviceDb } from '../../../config/database';
+import { IServiceExecution, ServiceExecutionLog } from '../service.types';
 
 export interface HomeInternetActivationInput {
   connectionId: string;
   packageName: string;
   subscriberName: string;
-  bandwidth?: string;
-  validity?: number;
+  amount: number;
+  execution: IServiceExecution;
 }
 
 export interface HomeInternetActivationResult {
   success: boolean;
-  activationId?: string;
-  activatedAt?: Date;
-  expiresAt?: Date;
   message: string;
+  log: ServiceExecutionLog;
 }
 
-/**
- * Home Internet Executor
- * Handles activation of home internet packages.
- * In production, this would call ISP's API.
- * Includes timeout and retry logic.
- */
 export async function executeHomeInternetActivation(
   input: HomeInternetActivationInput
 ): Promise<HomeInternetActivationResult> {
-  logger.info('Executing home internet activation', {
+  logger.info('Queueing home internet renewal job', {
     connectionId: input.connectionId,
     packageName: input.packageName,
   });
 
-  throw new AppError('Home internet activation executor is not implemented', 501);
+  // 1. Create an execution log
+  const log = await serviceDb.serviceExecutionLog.create({
+    data: {
+      serviceExecutionId: input.execution.id,
+      status: 'QUEUED',
+      requestPayload: input as any,
+    },
+  });
+
+  // 2. Add job to the queue
+  await ispRenewalQueue.add(
+    `renewal-${input.connectionId}-${log.id}`,
+    {
+      executionLogId: log.id,
+      clientId: input.connectionId,
+      amount: input.amount,
+    }
+  );
+
+  logger.info(`Job ${log.id} queued for connection ${input.connectionId}`);
+
+  return {
+    success: true,
+    message: 'Your internet renewal request has been queued and will be processed shortly.',
+    log: log as any,
+  };
 }

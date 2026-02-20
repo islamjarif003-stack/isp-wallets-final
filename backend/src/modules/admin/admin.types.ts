@@ -61,7 +61,7 @@ export interface AssignRoleInput {
 
 export interface UpdateSettingInput {
   key: string;
-  value: string;
+  value: string | number | boolean;
   adminId: string;
   ipAddress?: string;
   userAgent?: string;

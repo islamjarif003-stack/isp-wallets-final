@@ -7,6 +7,7 @@ import { authRoutes } from './modules/auth/auth.routes';
 import { walletRoutes } from './modules/wallet/wallet.routes';
 import { serviceRoutes } from './modules/services/service.routes';
 import { adminRoutes } from './modules/admin/admin.routes';
+import { ispRoutes } from './modules/services/isp.routes';
 import { reportingRoutes } from './modules/reporting/reporting.routes';
 import { notificationRoutes } from './modules/notification/notification.routes';
 import { systemRoutes } from './modules/system/system.routes';
@@ -30,6 +31,7 @@ app.use(`${apiBase}/wallet`, walletRoutes);
 app.use(`${apiBase}/services`, serviceRoutes);
 app.use(`${apiBase}/notifications`, notificationRoutes);
 app.use(`${apiBase}/admin`, adminRoutes);
+app.use(`${apiBase}/admin/isp`, ispRoutes);
 app.use(`${apiBase}/reports`, reportingRoutes);
 app.use(`${apiBase}/system`, systemRoutes);
 

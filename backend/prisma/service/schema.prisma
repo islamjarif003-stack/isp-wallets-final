@@ -8,6 +8,197 @@ datasource db {
   url      = env("SERVICE_DATABASE_URL")
 }
 
+model ServicePackage {
+  id              String                @id @default(uuid()) @db.Uuid
+  serviceType     ServiceType           @map("service_type")
+  name            String                @db.VarChar(200)
+  description     String?
+  price           Decimal               @db.Decimal(15, 2)
+  commission      Decimal               @default(0) @db.Decimal(15, 2)
+  bandwidth       String?               @db.VarChar(50)
+  dataLimit       String?               @map("data_limit") @db.VarChar(50)
+  status          PackageStatus         @default(ACTIVE)
+  metadata        Json?
+  sortOrder       Int                   @default(0) @map("sort_order")
+  excelPackageId  String?               @unique @map("excel_package_id") @db.VarChar(100)
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  validity        Int?
+  homeServices    HomeService[]
+  hotspotCards    HotspotCard[]
+  hotspotServices HotspotService[]
+  executionLogs   ServiceExecutionLog[]
+
+  @@index([serviceType, status])
+  @@index([excelPackageId])
+  @@map("service_packages")
+}
+
+model HomeService {
+  id                  String          @id @default(uuid()) @db.Uuid
+  userId              String          @map("user_id") @db.Uuid
+  packageId           String          @map("package_id") @db.Uuid
+  connectionId        String          @unique @map("connection_id") @db.VarChar(50)
+  subscriberName      String          @map("subscriber_name") @db.VarChar(100)
+  address             String
+  area                String?         @db.VarChar(100)
+  status              OwnershipStatus @default(ACTIVE)
+  activatedAt         DateTime?       @map("activated_at")
+  expiresAt           DateTime?       @map("expires_at")
+  walletTransactionId String?         @map("wallet_transaction_id") @db.VarChar(255)
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  package             ServicePackage  @relation(fields: [packageId], references: [id])
+
+  @@index([userId])
+  @@index([connectionId])
+  @@map("home_services")
+}
+
+model HotspotService {
+  id                  String          @id @default(uuid()) @db.Uuid
+  userId              String          @map("user_id") @db.Uuid
+  packageId           String          @map("package_id") @db.Uuid
+  deviceMac           String?         @map("device_mac") @db.VarChar(20)
+  voucherCode         String?         @unique @map("voucher_code") @db.VarChar(50)
+  zoneId              String?         @map("zone_id") @db.VarChar(50)
+  status              OwnershipStatus @default(ACTIVE)
+  activatedAt         DateTime?       @map("activated_at")
+  expiresAt           DateTime?       @map("expires_at")
+  walletTransactionId String?         @map("wallet_transaction_id") @db.VarChar(255)
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  package             ServicePackage  @relation(fields: [packageId], references: [id])
+
+  @@index([userId])
+  @@index([voucherCode])
+  @@map("hotspot_services")
+}
+
+model MobileRecharge {
+  id                  String          @id @default(uuid()) @db.Uuid
+  userId              String          @map("user_id") @db.Uuid
+  mobileNumber        String          @map("mobile_number") @db.VarChar(15)
+  operator            String          @db.VarChar(30)
+  amount              Decimal         @db.Decimal(15, 2)
+  rechargeType        String          @map("recharge_type") @db.VarChar(20)
+  executionStatus     ExecutionStatus @default(PENDING) @map("execution_status")
+  externalReference   String?         @map("external_reference") @db.VarChar(255)
+  walletTransactionId String?         @map("wallet_transaction_id") @db.VarChar(255)
+  failureReason       String?         @map("failure_reason")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([mobileNumber])
+  @@index([executionStatus])
+  @@map("mobile_recharges")
+}
+
+model ElectricityBill {
+  id                  String          @id @default(uuid()) @db.Uuid
+  userId              String          @map("user_id") @db.Uuid
+  meterNumber         String          @map("meter_number") @db.VarChar(50)
+  provider            String          @db.VarChar(50)
+  accountHolder       String?         @map("account_holder") @db.VarChar(100)
+  amount              Decimal         @db.Decimal(15, 2)
+  billMonth           String?         @map("bill_month") @db.VarChar(20)
+  executionStatus     ExecutionStatus @default(PENDING) @map("execution_status")
+  externalReference   String?         @map("external_reference") @db.VarChar(255)
+  walletTransactionId String?         @map("wallet_transaction_id") @db.VarChar(255)
+  failureReason       String?         @map("failure_reason")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([meterNumber])
+  @@index([executionStatus])
+  @@map("electricity_bills")
+}
+
+model StbPackage {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @db.VarChar(200)
+  price        Decimal       @db.Decimal(15, 2)
+  validityDays Int           @map("validity_days")
+  status       PackageStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  stbServices  StbService[]
+
+  @@map("stb_packages")
+}
+
+model StbService {
+  id                  String          @id @default(uuid()) @db.Uuid
+  userId              String          @map("user_id") @db.Uuid
+  stbNumber           String          @map("stb_number") @db.VarChar(50)
+  packageId           String          @map("package_id") @db.Uuid
+  status              OwnershipStatus @default(ACTIVE)
+  startDate           DateTime        @default(now()) @map("start_date")
+  endDate             DateTime        @map("end_date")
+  walletTransactionId String?         @map("wallet_transaction_id") @db.VarChar(255)
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  package             StbPackage      @relation(fields: [packageId], references: [id])
+
+  @@index([userId])
+  @@index([stbNumber])
+  @@index([status])
+  @@map("stb_services")
+}
+
+model ServiceExecutionLog {
+  id                  String          @id @default(uuid()) @db.Uuid
+  serviceType         ServiceType     @map("service_type")
+  serviceRecordId     String          @map("service_record_id") @db.VarChar(255)
+  packageId           String?         @map("package_id") @db.Uuid
+  userId              String          @map("user_id") @db.Uuid
+  status              ExecutionStatus
+  walletTransactionId String?         @map("wallet_transaction_id") @db.VarChar(255)
+  refundTransactionId String?         @map("refund_transaction_id") @db.VarChar(255)
+  executedBy          String?         @map("executed_by") @db.VarChar(255)
+  executionMethod     ExecutionMethod @default(AUTOMATIC) @map("execution_method")
+  errorMessage        String?         @map("error_message")
+  requestPayload      Json?           @map("request_payload")
+  responsePayload     Json?           @map("response_payload")
+  startedAt           DateTime?       @map("started_at")
+  completedAt         DateTime?       @map("completed_at")
+  duration            Int?
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  details             Json?           @map("details")
+  package             ServicePackage? @relation(fields: [packageId], references: [id])
+
+  @@index([serviceType, status])
+  @@index([serviceRecordId])
+  @@index([walletTransactionId])
+  @@map("service_execution_logs")
+}
+
+model HotspotCard {
+  id        String         @id @default(uuid()) @db.Uuid
+  packageId String         @map("package_id") @db.Uuid
+  code      String         @unique @db.VarChar(100)
+  status    CardStatus     @default(AVAILABLE)
+  usedBy    String?        @map("used_by") @db.Uuid
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  package   ServicePackage @relation(fields: [packageId], references: [id])
+
+  @@index([packageId, status])
+  @@map("hotspot_cards")
+}
+
+model IspClientMap {
+  id             String   @id @default(cuid())
+  clientId       String   @unique
+  subscriptionId String   @unique
+  lastVerifiedAt DateTime @updatedAt
+
+  @@map("isp_client_map")
+}
+
 enum ServiceType {
   HOME_INTERNET
   HOTSPOT_WIFI
@@ -23,11 +214,15 @@ enum PackageStatus {
 }
 
 enum ExecutionStatus {
-  PENDING
-  EXECUTING
   COMPLETED
   FAILED
+  MAPPING_CLIENT
+  PENDING
+  PROCESSING
+  QUEUED
   REFUNDED
+  RENEWING
+  VERIFYING
 }
 
 enum OwnershipStatus {
@@ -44,192 +239,4 @@ enum CardStatus {
 enum ExecutionMethod {
   AUTOMATIC
   MANUAL
-}
-
-model ServicePackage {
-  id             String        @id @default(uuid()) @db.Uuid
-  serviceType    ServiceType   @map("service_type")
-  name           String        @db.VarChar(200)
-  description    String?       @db.Text
-  price          Decimal       @db.Decimal(15, 2)
-  commission     Decimal       @default(0) @db.Decimal(15, 2)
-  validity       Int?          // days
-  bandwidth      String?       @db.VarChar(50)
-  dataLimit      String?       @map("data_limit") @db.VarChar(50)
-  status         PackageStatus @default(ACTIVE)
-  metadata       Json?
-  sortOrder      Int           @default(0) @map("sort_order")
-  excelPackageId String?       @unique @map("excel_package_id") @db.VarChar(100)
-  createdAt      DateTime      @default(now()) @map("created_at")
-  updatedAt      DateTime      @updatedAt @map("updated_at")
-
-  homeServices     HomeService[]
-  hotspotServices  HotspotService[]
-  hotspotCards     HotspotCard[]
-  executionLogs    ServiceExecutionLog[]
-
-  @@index([serviceType, status])
-  @@index([excelPackageId])
-  @@map("service_packages")
-}
-
-model HomeService {
-  id                    String          @id @default(uuid()) @db.Uuid
-  userId                String          @map("user_id") @db.Uuid
-  packageId             String          @map("package_id") @db.Uuid
-  connectionId          String          @unique @map("connection_id") @db.VarChar(50)
-  subscriberName        String          @map("subscriber_name") @db.VarChar(100)
-  address               String          @db.Text
-  area                  String?         @db.VarChar(100)
-  status                OwnershipStatus @default(ACTIVE)
-  activatedAt           DateTime?       @map("activated_at")
-  expiresAt             DateTime?       @map("expires_at")
-  walletTransactionId   String?         @map("wallet_transaction_id") @db.VarChar(255)
-  createdAt             DateTime        @default(now()) @map("created_at")
-  updatedAt             DateTime        @updatedAt @map("updated_at")
-
-  package ServicePackage @relation(fields: [packageId], references: [id])
-
-  @@index([userId])
-  @@index([connectionId])
-  @@map("home_services")
-}
-
-model HotspotService {
-  id                    String          @id @default(uuid()) @db.Uuid
-  userId                String          @map("user_id") @db.Uuid
-  packageId             String          @map("package_id") @db.Uuid
-  deviceMac             String?         @map("device_mac") @db.VarChar(20)
-  voucherCode           String?         @unique @map("voucher_code") @db.VarChar(50)
-  zoneId                String?         @map("zone_id") @db.VarChar(50)
-  status                OwnershipStatus @default(ACTIVE)
-  activatedAt           DateTime?       @map("activated_at")
-  expiresAt             DateTime?       @map("expires_at")
-  walletTransactionId   String?         @map("wallet_transaction_id") @db.VarChar(255)
-  createdAt             DateTime        @default(now()) @map("created_at")
-  updatedAt             DateTime        @updatedAt @map("updated_at")
-
-  package ServicePackage @relation(fields: [packageId], references: [id])
-
-  @@index([userId])
-  @@index([voucherCode])
-  @@map("hotspot_services")
-}
-
-model MobileRecharge {
-  id                    String          @id @default(uuid()) @db.Uuid
-  userId                String          @map("user_id") @db.Uuid
-  mobileNumber          String          @map("mobile_number") @db.VarChar(15)
-  operator              String          @db.VarChar(30)
-  amount                Decimal         @db.Decimal(15, 2)
-  rechargeType          String          @map("recharge_type") @db.VarChar(20)
-  executionStatus       ExecutionStatus @default(PENDING) @map("execution_status")
-  externalReference     String?         @map("external_reference") @db.VarChar(255)
-  walletTransactionId   String?         @map("wallet_transaction_id") @db.VarChar(255)
-  failureReason         String?         @map("failure_reason") @db.Text
-  createdAt             DateTime        @default(now()) @map("created_at")
-  updatedAt             DateTime        @updatedAt @map("updated_at")
-
-  @@index([userId])
-  @@index([mobileNumber])
-  @@index([executionStatus])
-  @@map("mobile_recharges")
-}
-
-model ElectricityBill {
-  id                    String          @id @default(uuid()) @db.Uuid
-  userId                String          @map("user_id") @db.Uuid
-  meterNumber           String          @map("meter_number") @db.VarChar(50)
-  provider              String          @db.VarChar(50)
-  accountHolder         String?         @map("account_holder") @db.VarChar(100)
-  amount                Decimal         @db.Decimal(15, 2)
-  billMonth             String?         @map("bill_month") @db.VarChar(20)
-  executionStatus       ExecutionStatus @default(PENDING) @map("execution_status")
-  externalReference     String?         @map("external_reference") @db.VarChar(255)
-  walletTransactionId   String?         @map("wallet_transaction_id") @db.VarChar(255)
-  failureReason         String?         @map("failure_reason") @db.Text
-  createdAt             DateTime        @default(now()) @map("created_at")
-  updatedAt             DateTime        @updatedAt @map("updated_at")
-
-  @@index([userId])
-  @@index([meterNumber])
-  @@index([executionStatus])
-  @@map("electricity_bills")
-}
-
-model StbPackage {
-  id           String        @id @default(uuid()) @db.Uuid
-  name         String        @db.VarChar(200)
-  price        Decimal       @db.Decimal(15, 2)
-  validityDays Int           @map("validity_days")
-  status       PackageStatus @default(ACTIVE)
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-
-  stbServices StbService[]
-
-  @@map("stb_packages")
-}
-
-model StbService {
-  id                  String          @id @default(uuid()) @db.Uuid
-  userId              String          @map("user_id") @db.Uuid
-  stbNumber           String          @map("stb_number") @db.VarChar(50)
-  packageId           String          @map("package_id") @db.Uuid
-  status              OwnershipStatus @default(ACTIVE)
-  startDate           DateTime        @default(now()) @map("start_date")
-  endDate             DateTime        @map("end_date")
-  walletTransactionId String?         @map("wallet_transaction_id") @db.VarChar(255)
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
-
-  package StbPackage @relation(fields: [packageId], references: [id])
-
-  @@index([userId])
-  @@index([stbNumber])
-  @@index([status])
-  @@map("stb_services")
-}
-
-model ServiceExecutionLog {
-  id                    String          @id @default(uuid()) @db.Uuid
-  serviceType           ServiceType     @map("service_type")
-  serviceRecordId       String          @map("service_record_id") @db.VarChar(255)
-  packageId             String?         @map("package_id") @db.Uuid
-  userId                String          @map("user_id") @db.Uuid
-  status                ExecutionStatus
-  walletTransactionId   String?         @map("wallet_transaction_id") @db.VarChar(255)
-  refundTransactionId   String?         @map("refund_transaction_id") @db.VarChar(255)
-  executedBy            String?         @map("executed_by") @db.VarChar(255)
-  executionMethod       ExecutionMethod @default(AUTOMATIC) @map("execution_method")
-  errorMessage          String?         @map("error_message") @db.Text
-  requestPayload        Json?           @map("request_payload")
-  responsePayload       Json?           @map("response_payload")
-  startedAt             DateTime?       @map("started_at")
-  completedAt           DateTime?       @map("completed_at")
-  duration              Int?            // milliseconds
-  createdAt             DateTime        @default(now()) @map("created_at")
-  updatedAt             DateTime        @updatedAt @map("updated_at")
-
-  package     ServicePackage? @relation(fields: [packageId], references: [id])
-
-  @@index([serviceType, status])
-  @@index([serviceRecordId])
-  @@index([walletTransactionId])
-  @@map("service_execution_logs")
-}
-
-model HotspotCard {
-  id          String         @id @default(uuid()) @db.Uuid
-  packageId   String         @map("package_id") @db.Uuid
-  code        String         @unique @db.VarChar(100)
-  status      CardStatus     @default(AVAILABLE)
-  usedBy      String?        @map("used_by") @db.Uuid
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
-
-  package     ServicePackage @relation(fields: [packageId], references: [id])
-
-  @@index([packageId, status])
-  @@map("hotspot_cards")
 }
