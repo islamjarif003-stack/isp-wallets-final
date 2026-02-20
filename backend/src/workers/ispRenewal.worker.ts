@@ -86,38 +86,83 @@ const processIspRenewal = async (job: Job<IspRenewalJobData>) => {
 };
 
 async function loginToIspPortal(page: Page) {
-  console.log('Logging into ISP portal...');
-  await page.goto(process.env.ISP_PORTAL_URL || 'http://isppanel.com/login');
-  
-  // Replace with actual selectors and credentials
-  await page.fill('#username', process.env.ISP_PORTAL_USER || 'admin');
-  await page.fill('#password', process.env.ISP_PORTAL_PASS || 'password');
-  await page.click('button[type="submit"]');
+  const loginUrl = process.env.ISP_PORTAL_URL;
+  if (!loginUrl) throw new Error('ISP_PORTAL_URL is not defined in .env');
 
-  // Wait for navigation to complete
-  await page.waitForNavigation();
+  console.log(`Navigating to ISP portal login page at ${loginUrl}`);
+  await page.goto(loginUrl);
+
+  // --- USER ACTION NEEDED ---
+  // Please provide the correct selectors for the username, password, and submit button.
+  const usernameSelector = '#username'; // <-- Replace with actual username input selector
+  const passwordSelector = '#password'; // <-- Replace with actual password input selector
+  const submitButtonSelector = 'button[type="submit"]'; // <-- Replace with actual submit button selector
+  const successUrlOrSelector = '/dashboard'; // <-- Replace with a URL path or a unique selector that appears only after a successful login
+
+  console.log('Filling login credentials...');
+  await page.fill(usernameSelector, process.env.ISP_PORTAL_USER || '');
+  await page.fill(passwordSelector, process.env.ISP_PORTAL_PASS || '');
+  
+  console.log('Submitting login form...');
+  await page.click(submitButtonSelector);
+
+  console.log(`Waiting for login success indicator: ${successUrlOrSelector}`);
+  // Wait for either a URL change or a specific element to appear
+  await page.waitForURL((url) => url.pathname.includes(successUrlOrSelector));
+  
   console.log('Login successful.');
 }
 
 async function findAndRenewClient(page: Page, clientId: string, amount: number): Promise<boolean> {
-  console.log(`Searching for client: ${clientId}`);
+  // --- USER ACTION NEEDED ---
+  // Please provide the correct selectors and workflow for finding and renewing a client.
+  const clientSearchUrl = process.env.ISP_CLIENT_SEARCH_URL; // e.g., http://isppanel.com/clients/search
+  if (!clientSearchUrl) throw new Error('ISP_CLIENT_SEARCH_URL is not defined in .env');
+
+  console.log(`Navigating to client search page at ${clientSearchUrl}`);
+  await page.goto(clientSearchUrl);
+
+  const searchInputSelector = '#search-client-input'; // <-- Replace with actual search input selector
+  const searchButtonSelector = '#search-client-button'; // <-- Replace with actual search button selector
+  // This selector should target a unique element for the client row that contains the client ID.
+  // Example: `tr[data-client-id="${clientId}"]`
+  const clientRowSelector = `.client-row[data-id="${clientId}"]`; // <-- Replace with a selector that uniquely identifies the client's row or entry
   
-  // Replace with actual selectors for searching client
-  await page.fill('#search-client', clientId);
-  await page.click('#search-button');
-  await page.waitForTimeout(2000); // Wait for search results
+  console.log(`Searching for client ID: ${clientId}`);
+  await page.fill(searchInputSelector, clientId);
+  await page.click(searchButtonSelector);
 
-  // Click on the client profile/renew button
-  await page.click(`.client-row[data-id="${clientId}"] .renew-button`);
+  console.log(`Waiting for client row to appear with selector: ${clientRowSelector}`);
+  await page.waitForSelector(clientRowSelector, { timeout: 10000 }); // Wait 10 seconds for search results
 
-  // On the renewal page
-  await page.waitForSelector('#renewal-amount');
-  await page.fill('#renewal-amount', amount.toString());
-  await page.click('#confirm-renewal');
+  // This selector should target the 'Renew' button specifically for that client.
+  const renewButtonSelector = `${clientRowSelector} .renew-button`; // <-- Replace with the selector for the renew button within the client's row
+  
+  console.log('Clicking renew button...');
+  await page.click(renewButtonSelector);
 
-  // Verify success
-  const successMessage = await page.textContent('.renewal-success-message');
-  return successMessage?.includes('successfully renewed') || false;
+  // --- On the renewal page/modal ---
+  const renewalAmountInputSelector = '#renewal-amount'; // <-- Replace with renewal amount input selector
+  const confirmRenewalButtonSelector = '#confirm-renewal-button'; // <-- Replace with confirm button selector
+  const successIndicatorSelector = '.renewal-success-message'; // <-- Replace with a selector for the success message element
+  const successMessageText = 'successfully renewed'; // <-- Replace with the text that confirms success
+
+  console.log('Waiting for renewal form to appear...');
+  await page.waitForSelector(renewalAmountInputSelector);
+
+  console.log(`Entering renewal amount: ${amount}`);
+  await page.fill(renewalAmountInputSelector, amount.toString());
+  
+  console.log('Confirming renewal...');
+  await page.click(confirmRenewalButtonSelector);
+
+  console.log(`Waiting for success message with selector: ${successIndicatorSelector}`);
+  await page.waitForSelector(successIndicatorSelector, { timeout: 15000 }); // Wait 15 seconds for confirmation
+
+  const successMessage = await page.textContent(successIndicatorSelector);
+  console.log(`Found confirmation message: "${successMessage}"`);
+  
+  return successMessage?.toLowerCase().includes(successMessageText.toLowerCase()) || false;
 }
 
 // ... (worker definition)
