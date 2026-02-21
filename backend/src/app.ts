@@ -30,8 +30,8 @@ app.use(`${apiBase}/auth`, authRoutes);
 app.use(`${apiBase}/wallet`, walletRoutes);
 app.use(`${apiBase}/services`, serviceRoutes);
 app.use(`${apiBase}/notifications`, notificationRoutes);
-app.use(`${apiBase}/admin`, adminRoutes);
 app.use(`${apiBase}/admin/isp`, ispRoutes);
+app.use(`${apiBase}/admin`, adminRoutes);
 app.use(`${apiBase}/reports`, reportingRoutes);
 app.use(`${apiBase}/system`, systemRoutes);
 

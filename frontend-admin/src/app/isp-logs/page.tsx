@@ -1,22 +1,47 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { api } from '@/lib/api';
+import React from 'react';
+import { api, getToken } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { FaSync, FaSearch, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 interface IspLog {
   id: string;
+  serviceType: string;
+  serviceRecordId: string;
+  packageId: string;
+  userId: string;
+  userName: string;
   status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'PENDING' | 'REFUNDED';
+  walletTransactionId: string;
+  refundTransactionId?: string;
+  executedBy: string | null;
+  executionMethod: string;
+  errorMessage?: string;
   requestPayload: { 
+    userId: string;
+    address: string;
+    walletId: string;
+    packageId: string;
     connectionId: string;
+    subscriberName: string;
     amount: number;
   };
-  createdAt: string;
-  completedAt?: string;
+  responsePayload?: {
+    failedReason: string;
+  };
   startedAt?: string;
-  errorMessage?: string;
+  completedAt?: string;
+  duration: number;
+  createdAt: string;
+  updatedAt: string;
   details?: any;
+  package?: {
+    name: string;
+    serviceType: string;
+    price: number;
+  };
 }
 
 const StatusBadge = ({ status }: { status: IspLog['status'] }) => {
@@ -44,15 +69,21 @@ const IspLogsPage = () => {
 
   const fetchLogs = useCallback(async (pageNum: number, currentFilters: typeof filters) => {
     setLoading(true);
+    const token = getToken();
+    if (!token) {
+      toast.error('You are not authenticated. Please log in.');
+      setLoading(false);
+      return;
+    }
     try {
       const params = new URLSearchParams({
         page: pageNum.toString(),
         limit: '15',
         ...currentFilters,
       });
-      const response = await api(`/admin/isp/logs?${params.toString()}`, { method: 'GET' });
-      setLogs(response.data.logs);
-      setTotalPages(Math.ceil(response.data.total / 15));
+      const response = await api(`/admin/isp/logs?${params.toString()}`, { method: 'GET', token });
+      setLogs(response.logs || []);
+        setTotalPages(Math.ceil(response.total / 15));
       setPage(pageNum);
     } catch (error) {
       toast.error('Failed to fetch ISP logs.');
@@ -131,6 +162,7 @@ const IspLogsPage = () => {
           <thead className="bg-gray-50">
             <tr>
               <th className="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+              <th className="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
               <th className="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamps</th>
               <th className="py-3 px-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -138,16 +170,24 @@ const IspLogsPage = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {loading && logs.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-10 text-gray-500">Loading logs...</td></tr>
+              <tr>
+                <td colSpan={5} className="text-center py-10 text-gray-500 flex items-center justify-center space-x-2">
+                  <FaSync className="animate-spin text-blue-500 text-xl" />
+                  <span>Loading logs...</span>
+                </td>
+              </tr>
             ) : logs.length === 0 ? (
-              <tr><td colSpan={4} className="text-center py-10 text-gray-500">No logs found.</td></tr>
+              <tr><td colSpan={5} className="text-center py-10 text-gray-500">No logs found.</td></tr>
             ) : (
               logs.map((log) => (
-                <>
-                  <tr key={log.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}>
+                <React.Fragment key={log.id}>
+                  <tr className="hover:bg-gray-100 cursor-pointer" onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}>
                     <td className="py-4 px-6 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{log.requestPayload?.connectionId || 'N/A'}</div>
                         <div className="text-sm text-gray-500">Amount: {log.requestPayload?.amount || 'N/A'}</div>
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{log.userName}</div>
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap"><StatusBadge status={log.status} /></td>
                     <td className="py-4 px-6 whitespace-nowrap text-sm text-gray-500">
@@ -157,7 +197,7 @@ const IspLogsPage = () => {
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap">
                       {log.status === 'FAILED' && (
-                        <button 
+                        <button
                           onClick={(e) => { e.stopPropagation(); handleRetry(log.id); }}
                           className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 text-sm"
                         >
@@ -167,22 +207,18 @@ const IspLogsPage = () => {
                     </td>
                   </tr>
                   {expandedLog === log.id && (
-                      <tr className="bg-gray-100">
-                          <td colSpan={4} className="p-4">
-                              <div className="text-sm text-gray-800">
-                                  <p><strong className="font-semibold">Log ID:</strong> {log.id}</p>
-                                  {log.errorMessage && <p className="mt-2"><strong className="font-semibold">Error:</strong> <code className="text-red-600 bg-red-50 p-1 rounded">{log.errorMessage}</code></p>}
-                                  {log.details && (
-                                      <div className="mt-2">
-                                          <strong className="font-semibold">Details:</strong>
-                                          <pre className="bg-gray-200 p-2 rounded mt-1 text-xs overflow-auto">{JSON.stringify(log.details, null, 2)}</pre>
-                                      </div>
-                                  )}
-                              </div>
-                          </td>
-                      </tr>
+                    <tr>
+                      <td colSpan={5} className="p-4 bg-gray-50">
+                        <div className="bg-white p-4 rounded-lg shadow-inner">
+                          <h3 className="text-lg font-semibold mb-2">Log Details</h3>
+                          <pre className="whitespace-pre-wrap text-sm text-gray-700 bg-gray-100 p-3 rounded-md overflow-x-auto">
+                            {JSON.stringify(log, null, 2)}
+                          </pre>
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                </>
+                </React.Fragment>
               ))
             )}
           </tbody>

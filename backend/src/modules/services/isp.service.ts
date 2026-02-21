@@ -1,10 +1,12 @@
-import { getServiceDb } from '../../config/database';
+import { getServiceDb, getAccountWalletDb } from '../../config/database';
 import { ispRenewalQueue } from '../../queues/ispRenewal.queue';
 import { AppError } from '../../utils/errors';
 
 export class IspService {
   async getLogs(query: any) {
     const { page = 1, limit = 10, status, connectionId } = query;
+    const parsedPage = parseInt(page as string, 10);
+    const parsedLimit = parseInt(limit as string, 10);
     const where: any = {};
 
     if (status) {
@@ -14,22 +16,50 @@ export class IspService {
     if (connectionId) {
       where.requestPayload = {
         path: ['connectionId'],
-        string_contains: connectionId,
+        equals: connectionId,
       };
     }
 
-    const logs = await getServiceDb().serviceExecutionLog.findMany({
+    const serviceDb = getServiceDb();
+    const accountWalletDb = getAccountWalletDb();
+
+    const logs = await serviceDb.serviceExecutionLog.findMany({
       where,
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (parsedPage - 1) * parsedLimit,
+      take: parsedLimit,
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    const total = await getServiceDb().serviceExecutionLog.count({ where });
+    const total = await serviceDb.serviceExecutionLog.count({ where });
 
-    return { logs, total, page, limit };
+    // Extract unique user IDs from the logs
+    const userIds = [...new Set(logs.map(log => log.userId))];
+
+    // Fetch user full names
+    const users = await accountWalletDb.user.findMany({
+      where: {
+        id: {
+          in: userIds,
+        },
+      },
+      select: {
+        id: true,
+        fullName: true,
+      },
+    });
+
+    // Create a map for quick lookup of user names
+    const userMap = new Map(users.map(user => [user.id, user.fullName]));
+
+    // Attach user names to the logs
+    const logsWithUserNames = logs.map(log => ({
+      ...log,
+      userName: userMap.get(log.userId) || 'N/A', // Default to 'N/A' if user not found
+    }));
+
+    return { logs: logsWithUserNames, total, page: parsedPage, limit: parsedLimit };
   }
 
   async retryJob(logId: string) {

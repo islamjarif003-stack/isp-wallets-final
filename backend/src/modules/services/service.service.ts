@@ -293,7 +293,7 @@ export class ServiceService {
           userId: input.userId,
           status: ExecutionStatus.PENDING,
           executionMethod: 'AUTOMATIC',
-          requestPayload: input as any,
+          requestPayload: { ...(input as any), amount: pkg.price },
         },
       });
 
@@ -1542,12 +1542,19 @@ export class ServiceService {
   async getAllExecutionLogs(
     serviceType?: ServiceType,
     status?: ExecutionStatus,
+    connectionId?: string,
     page: number = 1,
     limit: number = 20
   ) {
     const where: any = {};
     if (serviceType) where.serviceType = serviceType;
     if (status) where.status = status;
+    if (connectionId && connectionId.trim() !== '') {
+      where.requestPayload = {
+        path: ['connectionId'],
+        equals: connectionId,
+      };
+    }
 
     const [logs, total] = await Promise.all([
       this.serviceDb.serviceExecutionLog.findMany({
