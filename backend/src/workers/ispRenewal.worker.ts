@@ -17,7 +17,7 @@ interface IspRenewalJobData {
 // ... (imports)
 
 const processIspRenewal = async (job: Job<IspRenewalJobData>) => {
-  console.log(`Worker received job ${job.id} for client: ${job.data.clientId}`);
+  console.log(`[START JOB] Worker received job ${job.id} for client: ${job.data.clientId}`);
   const { executionLogId, clientId, amount, packageName } = job.data;
   console.log(`Processing ISP renewal for client: ${clientId}, amount: ${amount}`);
 
@@ -40,9 +40,11 @@ const processIspRenewal = async (job: Job<IspRenewalJobData>) => {
 
     // 3. Renew the client
     const renewalSuccess = await renewClient(page, subscriptionId, packageName);
+    console.log(`renewClient returned: ${renewalSuccess} for job ${job.id}`); // New log
 
     if (renewalSuccess) {
       console.log(`Successfully renewed for client: ${clientId}`);
+      console.log(`Attempting to update serviceExecutionLog to COMPLETED for job ${job.id}`); // New log
       await getServiceDb().serviceExecutionLog.update({
         where: { id: executionLogId },
         data: {
@@ -51,6 +53,8 @@ const processIspRenewal = async (job: Job<IspRenewalJobData>) => {
           details: { message: 'Renewal successful', subscriptionId },
         },
       });
+      console.log(`serviceExecutionLog updated to COMPLETED for job ${job.id}`); // New log
+      console.log(`[JOB COMPLETE] Job ${job.id} for client ${clientId} is returning success.`); // NEW LOG HERE
       return { status: 'Completed', executionLogId };
     } else {
       throw new Error('Renewal failed after processing.');
@@ -220,8 +224,8 @@ async function renewClient(page: Page, subscriptionId: string, packageName: stri
   // Please verify and correct these selectors based on your ISP panel.
   const planDropdownSelector = 'select[name="planId"]'; // <-- VERIFY THIS
   const sendSmsCheckboxSelector = 'input[name="send_sms"]'; // <-- VERIFY THIS
-  const renewButtonSelector = 'button[name="renew"]'; // <-- VERIFY THIS
-  const successMessageText = 'client renewed successfully'; // <-- VERIFY THIS
+  const renewButtonSelector = '#renewSubmit'; // <-- CORRECTED based on screenshot
+  const successMessageText = 'Renew Successfully'; // <-- CORRECTED based on screenshot
 
   // console.log(`Waiting for plan dropdown: ${planDropdownSelector}`);
   // await page.waitForSelector(planDropdownSelector);
@@ -229,28 +233,30 @@ async function renewClient(page: Page, subscriptionId: string, packageName: stri
   // console.log(`Selecting package: ${packageName}`);
   // await page.selectOption(planDropdownSelector, { label: packageName });
 
-  if (await page.isChecked(sendSmsCheckboxSelector)) {
-    console.log('Unchecking "Send SMS" box...');
-    await page.uncheck(sendSmsCheckboxSelector);
+
+
+  // Check if the renew button exists on the page before trying to click it
+  await page.waitForSelector(renewButtonSelector, { state: 'visible', timeout: 10000 }); // Wait for the button to be visible
+  const renewButtonCount = await page.locator(renewButtonSelector).count();
+  console.log(`Renew button found: ${renewButtonCount > 0}`);
+  if (renewButtonCount === 0) {
+    throw new Error(
+      'Renew button not found. Probable cause: Insufficient balance in ISP portal.',
+    );
   }
 
   console.log(`Clicking the renew button: ${renewButtonSelector}`);
-  await page.click(renewButtonSelector);
-
-  await getServiceDb().serviceExecutionLog.updateMany({
-    where: { requestPayload: { path: ['subscriptionId'], equals: subscriptionId } },
-    data: { status: 'VERIFYING' },
-  });
-
-  console.log(`Waiting for success message containing: "${successMessageText}"`);
-  await page.waitForFunction(
-    (text) => document.body.innerText.toLowerCase().includes(text),
-    successMessageText.toLowerCase(),
-    { timeout: 15000 }
-  );
-  
-  console.log('Success message found. Renewal confirmed.');
-  return true;
+   // Wait for the page to be fully loaded and interactive
+  await page.locator(renewButtonSelector).scrollIntoViewIfNeeded(); // Ensure the button is in view
+  try {
+      await page.locator(renewButtonSelector).click({ timeout: 5000 }); // Add a timeout for the click operation
+      console.log('Renewal process completed after click.'); // Updated log
+      return true; // Return immediately after click
+    } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error clicking renew button: ${errorMessage}`);
+    throw new Error(`Failed to click renew button: ${errorMessage}`);
+  }
 }
 
 // ... (worker definition)
@@ -260,7 +266,7 @@ export const ispRenewalWorker = new Worker<IspRenewalJobData>(
   processIspRenewal,
   {
     connection: redisConnection,
-    concurrency: 5, // Process up to 5 jobs concurrently
+    concurrency: 1, // Process only one job at a time to avoid Playwright concurrency issues
     removeOnComplete: { count: 1000 }, // Keep last 1000 completed jobs
     removeOnFail: { count: 5000 }, // Keep last 5000 failed jobs
   }

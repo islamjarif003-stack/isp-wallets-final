@@ -1,4 +1,4 @@
-process.env.LOG_LEVEL = 'debug'; // Temporary for debugging
+import 'tsconfig-paths/register';
 import { env } from './config/env';
 import { app } from './app';
 import { connectDatabases, disconnectDatabases } from './config/database';

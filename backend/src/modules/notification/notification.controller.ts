@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { getNotificationService } from './notification.service';
+import { RoleName } from '@prisma/account-wallet-client';
 
 const notificationService = getNotificationService();
 
 export class NotificationController {
-  async getMyNotifications(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyNotifications(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -22,7 +23,7 @@ export class NotificationController {
     }
   }
 
-  async getUnreadCount(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getUnreadCount(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       const count = await notificationService.getUnreadCount(req.user!.id);
       res.status(200).json({
@@ -34,7 +35,7 @@ export class NotificationController {
     }
   }
 
-  async markAsRead(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async markAsRead(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       await notificationService.markAsRead(req.params.notificationId, req.user!.id);
       res.status(200).json({
@@ -46,7 +47,7 @@ export class NotificationController {
     }
   }
 
-  async markAllAsRead(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async markAllAsRead(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       await notificationService.markAllAsRead(req.user!.id);
       res.status(200).json({

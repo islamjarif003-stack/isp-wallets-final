@@ -13,7 +13,7 @@ interface JwtPayload {
 }
 
 export async function authMiddleware(
-  req: Request,
+  req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; },
   _res: Response,
   next: NextFunction
 ): Promise<void> {

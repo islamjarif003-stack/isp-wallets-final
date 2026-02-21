@@ -3,6 +3,7 @@ import { HotspotService } from './hotspot.service';
 import { getLogger } from '../../../utils/logger';
 const logger = getLogger();
 import { UnauthorizedError } from '../../../utils/errors';
+import { RoleName } from '@prisma/account-wallet-client';
 
 const hotspotService = new HotspotService();
 
@@ -11,7 +12,7 @@ export class HotspotController {
   // ADMIN
   // ═══════════════════════════════════════════════════════════════
 
-  async addCards(req: Request, res: Response, next: NextFunction) {
+  async addCards(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       const result = await hotspotService.addCards(req.body, req.user!.id);
       res.status(201).json({
@@ -62,7 +63,7 @@ export class HotspotController {
     }
   }
 
-  async updateCard(req: Request, res: Response, next: NextFunction) {
+  async updateCard(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       await hotspotService.updateCard(
         req.params.cardId,
@@ -76,7 +77,7 @@ export class HotspotController {
     }
   }
 
-  async deleteCard(req: Request, res: Response, next: NextFunction) {
+  async deleteCard(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       await hotspotService.deleteCard(
         req.params.cardId,
@@ -89,7 +90,7 @@ export class HotspotController {
     }
   }
 
-  async deleteAllAvailableCards(req: Request, res: Response, next: NextFunction) {
+  async deleteAllAvailableCards(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       await hotspotService.deleteAllAvailableCards(
         req.body.packageId,
@@ -102,7 +103,7 @@ export class HotspotController {
     }
   }
 
-  async resetCard(req: Request, res: Response, next: NextFunction) {
+  async resetCard(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       await hotspotService.resetCard(req.params.cardId, req.user!.id);
       res.status(200).json({
@@ -131,7 +132,7 @@ export class HotspotController {
     }
   }
 
-  async purchaseHotspot(req: Request, res: Response, next: NextFunction) {
+  async purchaseHotspot(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       if (!req.user?.id || !req.user?.walletId) {
         logger.warn('Auth data missing in service purchase', { path: req.path });

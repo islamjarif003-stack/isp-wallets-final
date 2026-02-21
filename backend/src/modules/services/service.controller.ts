@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { RoleName } from '@prisma/account-wallet-client';
 import { ServiceService } from './service.service';
 import { ServiceType, ExecutionStatus } from '@prisma/service-client';
 import { getLogger } from '../../utils/logger';
@@ -10,7 +11,7 @@ export class ServiceController {
   private logger = getLogger();
   // ═══════════ PACKAGES ═══════════
 
-  async getPackages(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getPackages(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       const serviceType = req.query.serviceType as ServiceType | undefined;
       const page = parseInt(req.query.page as string) || 1;
@@ -81,7 +82,7 @@ export class ServiceController {
 
   // ═══════════ PURCHASES ═══════════
 
-  async purchaseHomeInternet(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async purchaseHomeInternet(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id || !req.user?.walletId) {
         this.logger.warn('Auth data missing in service purchase', { path: req.path });
@@ -110,7 +111,7 @@ export class ServiceController {
     }
   }
 
-  async purchaseHotspot(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async purchaseHotspot(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id || !req.user?.walletId) {
         this.logger.warn('Auth data missing in service purchase', { path: req.path });
@@ -137,7 +138,7 @@ export class ServiceController {
     }
   }
 
-  async purchaseMobileRecharge(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async purchaseMobileRecharge(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id || !req.user?.walletId) {
         this.logger.warn('Auth data missing in service purchase', { path: req.path });
@@ -165,7 +166,7 @@ export class ServiceController {
     }
   }
 
-  async purchaseElectricityBill(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async purchaseElectricityBill(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id || !req.user?.walletId) {
         this.logger.warn('Auth data missing in service purchase', { path: req.path });
@@ -196,7 +197,7 @@ export class ServiceController {
 
   // ═══════════ HISTORY ═══════════
 
-  async getMyServiceHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyServiceHistory(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id) {
         throw new UnauthorizedError('User not authenticated');
@@ -220,7 +221,7 @@ export class ServiceController {
     }
   }
 
-  async getMyHomeServices(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyHomeServices(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id) {
         throw new UnauthorizedError('User not authenticated');
@@ -237,7 +238,7 @@ export class ServiceController {
     }
   }
 
-  async getMyHotspotServices(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyHotspotServices(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id) {
         throw new UnauthorizedError('User not authenticated');
@@ -254,7 +255,7 @@ export class ServiceController {
     }
   }
 
-  async getMyRechargeHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyRechargeHistory(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id) {
         throw new UnauthorizedError('User not authenticated');
@@ -276,7 +277,7 @@ export class ServiceController {
     }
   }
 
-  async getMyElectricityHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyElectricityHistory(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id) {
         throw new UnauthorizedError('User not authenticated');
@@ -323,6 +324,7 @@ export class ServiceController {
       const result = await serviceService.getAllExecutionLogs(
         req.query.serviceType as ServiceType | undefined,
         req.query.status as ExecutionStatus | undefined,
+        req.query.connectionId as string | undefined,
         parseInt(req.query.page as string) || 1,
         parseInt(req.query.limit as string) || 20
       );
@@ -338,7 +340,7 @@ export class ServiceController {
     }
   }
 
-  async adminManualExecute(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async adminManualExecute(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id) {
         throw new UnauthorizedError('User not authenticated');
@@ -360,7 +362,7 @@ export class ServiceController {
     }
   }
 
-  async adminManualRefund(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async adminManualRefund(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id) {
         throw new UnauthorizedError('User not authenticated');
@@ -383,7 +385,7 @@ export class ServiceController {
     }
   }
 
-  async adminReleaseHomeConnectionOwnership(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async adminReleaseHomeConnectionOwnership(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.id) {
         throw new UnauthorizedError('User not authenticated');

@@ -3,12 +3,13 @@ import { AppError, ValidationError } from '../utils/errors';
 import { getLogger } from '../utils/logger';
 import { env } from '../config/env';
 import { ZodError } from 'zod';
+import { RoleName } from '@prisma/account-wallet-client';
 
 const logger = getLogger();
 
 export function errorHandler(
   err: Error,
-  req: Request,
+  req: Request & { user?: { id: string; role: RoleName; walletId?: string; } },
   res: Response,
   _next: NextFunction
 ): void {

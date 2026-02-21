@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from './auth.service';
+import { RoleName } from '@prisma/account-wallet-client';
 
 const authService = new AuthService();
 
 export class AuthController {
   async signupRequestOtp(
-    req: Request,
+    req: Request & { user?: { id: string; role: RoleName; walletId?: string; } },
     res: Response,
     next: NextFunction
   ): Promise<void> {
@@ -26,7 +27,7 @@ export class AuthController {
   }
 
   async signupComplete(
-    req: Request,
+    req: Request & { user?: { id: string; role: RoleName; walletId?: string; } },
     res: Response,
     next: NextFunction
   ): Promise<void> {
@@ -48,7 +49,7 @@ export class AuthController {
   }
 
   async login(
-    req: Request,
+    req: Request & { user?: { id: string; role: RoleName; walletId?: string; } },
     res: Response,
     next: NextFunction
   ): Promise<void> {
@@ -66,7 +67,7 @@ export class AuthController {
   }
 
   async forgotPasswordRequest(
-    req: Request,
+    req: Request & { user?: { id: string; role: RoleName; walletId?: string; } },
     res: Response,
     next: NextFunction
   ): Promise<void> {
@@ -87,7 +88,7 @@ export class AuthController {
   }
 
   async forgotPasswordReset(
-    req: Request,
+    req: Request & { user?: { id: string; role: RoleName; walletId?: string; } },
     res: Response,
     next: NextFunction
   ): Promise<void> {
@@ -104,7 +105,7 @@ export class AuthController {
   }
 
   async refreshToken(
-    req: Request,
+    req: Request & { user?: { id: string; role: RoleName; walletId?: string; } },
     res: Response,
     next: NextFunction
   ): Promise<void> {
@@ -122,7 +123,7 @@ export class AuthController {
   }
 
   async getProfile(
-    req: Request,
+    req: Request & { user?: { id: string; role: RoleName; walletId?: string; } },
     res: Response,
     next: NextFunction
   ): Promise<void> {

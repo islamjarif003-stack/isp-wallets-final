@@ -3,7 +3,7 @@ import { RoleName } from '@prisma/account-wallet-client';
 import { ForbiddenError } from '../utils/errors';
 
 export function requireRoles(...roles: RoleName[]) {
-  return (req: Request, _res: Response, next: NextFunction): void => {
+  return (req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, _res: Response, next: NextFunction): void => {
     if (!req.user?.role) {
       return next(new ForbiddenError('Role not determined'));
     }

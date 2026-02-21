@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AdminService } from './admin.service';
+import { RoleName } from '@prisma/account-wallet-client';
 
 const adminService = new AdminService();
 
@@ -37,7 +38,7 @@ export class AdminController {
     }
   }
 
-  async updateUserStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateUserStatus(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       await adminService.updateUserStatus({
         ...req.body,
@@ -51,7 +52,7 @@ export class AdminController {
     }
   }
 
-  async assignRole(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async assignRole(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       await adminService.assignRole({
         ...req.body,
@@ -75,7 +76,7 @@ export class AdminController {
     }
   }
 
-  async updateSetting(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateSetting(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       await adminService.updateSetting({
         ...req.body,
@@ -90,7 +91,7 @@ export class AdminController {
   }
 
   async updateSupportChannels(
-    req: Request,
+    req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; },
     res: Response,
     next: NextFunction
   ): Promise<void> {
@@ -136,7 +137,7 @@ export class AdminController {
     }
   }
 
-  async resetUserPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async resetUserPassword(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       await adminService.resetUserPassword({
         userId: req.body.userId,

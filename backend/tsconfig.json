@@ -19,7 +19,7 @@
     },
     "noImplicitAny": false,
     "types": ["node"],
-    "typeRoots": ["./node_modules/@types", "./node_modules/@prisma"]
+    "typeRoots": ["./node_modules/@types", "./node_modules/@prisma", "./src/types"]
   },
   "include": ["src/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]

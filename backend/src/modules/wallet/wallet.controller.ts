@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { RoleName } from '@prisma/account-wallet-client';
 import { WalletService } from './wallet.service';
 import { UnauthorizedError } from '../../utils/errors';
 
@@ -6,7 +7,7 @@ const walletService = new WalletService();
 
 export class WalletController {
   // ─── USER: Get my balance ────────────────────────────
-  async getMyBalance(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyBalance(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await walletService.getBalanceByUserId(req.user!.id);
 
@@ -21,7 +22,7 @@ export class WalletController {
   }
 
   // ─── USER: Get my transaction history ────────────────
-  async getMyTransactions(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyTransactions(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.walletId) {
         throw new UnauthorizedError('Wallet ID is missing for the authenticated user.');
@@ -49,7 +50,7 @@ export class WalletController {
   }
 
   // ─── USER: Get my wallet summary ─────────────────────
-  async getMyWalletSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyWalletSummary(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user?.walletId) {
         throw new UnauthorizedError('Wallet ID is missing for the authenticated user.');
@@ -67,7 +68,7 @@ export class WalletController {
   }
 
   // ─── USER: Request add balance ───────────────────────
-  async requestAddBalance(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async requestAddBalance(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await walletService.createAddBalanceRequest({
         userId: req.user!.id,
@@ -100,7 +101,7 @@ export class WalletController {
   }
 
   // ─── USER: Get my balance requests ───────────────────
-  async getMyBalanceRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getMyBalanceRequests(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -120,7 +121,7 @@ export class WalletController {
   }
 
   // ─── ADMIN: Approve balance request ──────────────────
-  async approveBalanceRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async approveBalanceRequest(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await walletService.approveBalanceRequest({
         requestId: req.body.requestId,
@@ -141,7 +142,7 @@ export class WalletController {
   }
 
   // ─── ADMIN: Reject balance request ───────────────────
-  async rejectBalanceRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async rejectBalanceRequest(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       await walletService.rejectBalanceRequest({
         requestId: req.body.requestId,
@@ -161,7 +162,7 @@ export class WalletController {
   }
 
   // ─── ADMIN: Get all balance requests ─────────────────
-  async getAllBalanceRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getAllBalanceRequests(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -182,7 +183,7 @@ export class WalletController {
   }
 
   // ─── ADMIN: Wallet adjustment ────────────────────────
-  async walletAdjustment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async walletAdjustment(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await walletService.adminAdjustment({
         walletId: req.body.walletId,
@@ -205,7 +206,7 @@ export class WalletController {
   }
 
   // ─── ADMIN: Freeze wallet ───────────────────────────
-  async freezeWallet(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async freezeWallet(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       await walletService.freezeWallet(
         req.body.walletId,
@@ -225,7 +226,7 @@ export class WalletController {
   }
 
   // ─── ADMIN: Unfreeze wallet ─────────────────────────
-  async unfreezeWallet(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async unfreezeWallet(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction): Promise<void> {
     try {
       await walletService.unfreezeWallet(
         req.body.walletId,

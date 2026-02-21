@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { StbService } from './stb.service';
 import { getLogger } from '../../../utils/logger';
 import { UnauthorizedError, AppError } from '../../../utils/errors';
+import { RoleName } from '@prisma/account-wallet-client';
 
 const stbService = new StbService();
 
@@ -11,7 +12,7 @@ export class StbController {
   // ADMIN
   // ═══════════════════════════════════════════════════════════════
 
-  async adminReleaseStbOwnership(req: Request, res: Response, next: NextFunction) {
+  async adminReleaseStbOwnership(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       const result = await stbService.adminReleaseStbOwnership(
         req.body.stbNumber,
@@ -75,7 +76,7 @@ export class StbController {
   // PUBLIC / USER
   // ═══════════════════════════════════════════════════════════════
 
-  async getPackages(req: Request, res: Response, next: NextFunction) {
+  async getPackages(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       // If admin, can see inactive?
       // For now, strict: only active for users, all for admin if query param set
@@ -90,7 +91,7 @@ export class StbController {
     }
   }
 
-  async purchaseStbService(req: Request, res: Response, next: NextFunction) {
+  async purchaseStbService(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       if (!req.user?.id || !req.user?.walletId) {
         this.logger.warn('Auth data missing in service purchase', { path: req.path });
@@ -110,7 +111,7 @@ export class StbController {
     }
   }
 
-  async getMyStbServices(req: Request, res: Response, next: NextFunction) {
+  async getMyStbServices(req: Request & { user?: { id: string; role: RoleName; walletId?: string; }; ipAddress?: string; }, res: Response, next: NextFunction) {
     try {
       if (!req.user?.id) throw new AppError('User ID missing', 401);
 
